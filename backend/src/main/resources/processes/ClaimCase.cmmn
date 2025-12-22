@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cmmn:definitions xmlns:cmmn="http://www.omg.org/spec/CMMN/20151109/MODEL"
+                   xmlns:flowable="http://flowable.org/cmmn"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xmlns:cmmndi="http://www.omg.org/spec/CMMN/20151109/CMMNDI"
+                   xmlns:dc="http://www.omg.org/spec/CMMN/20151109/DC"
+                   xmlns:di="http://www.omg.org/spec/CMMN/20151109/DI"
+                   targetNamespace="http://flowable.org/cmmn">
+
+    <cmmn:case id="insuranceClaimCase" name="Insurance Claim Case" flowable:initiatorVariableName="initiator">
+        <cmmn:casePlanModel id="casePlanModel" name="Insurance Claim Plan Model">
+
+            <!-- Plan Items -->
+            <cmmn:planItem id="planItemStageTriage" name="Triage" definitionRef="stageTriage" />
+            <cmmn:planItem id="planItemStageInvestigation" name="Investigation" definitionRef="stageInvestigation">
+                <cmmn:entryCriterion id="entrySentryInvestigation" sentryRef="sentryInvestigationEntry" />
+            </cmmn:planItem>
+            <cmmn:planItem id="planItemStageApproval" name="Approval" definitionRef="stageApproval">
+                <cmmn:entryCriterion id="entrySentryApproval" sentryRef="sentryApprovalEntry" />
+                <cmmn:exitCriterion id="exitSentryApproval" sentryRef="sentryApprovalExit" />
+            </cmmn:planItem>
+            <cmmn:planItem id="planItemStagePayment" name="Payment" definitionRef="stagePayment">
+                <cmmn:entryCriterion id="entrySentryPayment" sentryRef="sentryPaymentEntry" />
+            </cmmn:planItem>
+            <cmmn:planItem id="planItemStageClosure" name="Closure" definitionRef="stageClosure">
+                <cmmn:entryCriterion id="entrySentryClosure" sentryRef="sentryClosureEntry" />
+            </cmmn:planItem>
+            
+            <!-- Sentries -->
+            <cmmn:sentry id="sentryAssessComplexityEntry">
+                <cmmn:planItemOnPart sourceRef="planItemTaskReviewClaim">
+                    <cmmn:standardEvent>complete</cmmn:standardEvent>
+                </cmmn:planItemOnPart>
+            </cmmn:sentry>
+            <cmmn:sentry id="sentryInvestigationEntry">
+                <cmmn:planItemOnPart sourceRef="planItemTaskAssessComplexity">
+                    <cmmn:standardEvent>complete</cmmn:standardEvent>
+                </cmmn:planItemOnPart>
+                <cmmn:ifPart>
+                    <cmmn:condition><![CDATA[${claimComplexity == 'complex'}]]></cmmn:condition>
+                </cmmn:ifPart>
+            </cmmn:sentry>
+            <cmmn:sentry id="sentryAssessDamageEntry">
+                <cmmn:planItemOnPart sourceRef="planItemTaskGatherDocuments">
+                    <cmmn:standardEvent>complete</cmmn:standardEvent>
+                </cmmn:planItemOnPart>
+            </cmmn:sentry>
+            <cmmn:sentry id="sentryApprovalEntry">
+                <cmmn:planItemOnPart sourceRef="planItemTaskAssessComplexity">
+                    <cmmn:standardEvent>complete</cmmn:standardEvent>
+                </cmmn:planItemOnPart>
+                <cmmn:ifPart>
+                    <cmmn:condition><![CDATA[${claimComplexity == 'simple'}]]></cmmn:condition>
+                </cmmn:ifPart>
+            </cmmn:sentry>
+            <cmmn:sentry id="sentryFinalApprovalEntry">
+                <cmmn:planItemOnPart sourceRef="planItemTaskAssessDamage">
+                    <cmmn:standardEvent>complete</cmmn:standardEvent>
+                </cmmn:planItemOnPart>
+            </cmmn:sentry>
+            <cmmn:sentry id="sentryApprovalExit">
+                <cmmn:planItemOnPart sourceRef="planItemTaskFinalApproval">
+                    <cmmn:standardEvent>complete</cmmn:standardEvent>
+                </cmmn:planItemOnPart>
+                <cmmn:ifPart>
+                    <cmmn:condition><![CDATA[${approved == false}]]></cmmn:condition>
+                </cmmn:ifPart>
+            </cmmn:sentry>
+            <cmmn:sentry id="sentryPaymentEntry">
+                <cmmn:planItemOnPart sourceRef="planItemTaskFinalApproval">
+                    <cmmn:standardEvent>complete</cmmn:standardEvent>
+                </cmmn:planItemOnPart>
+                 <cmmn:ifPart>
+                    <cmmn:condition><![CDATA[${approved == true}]]></cmmn:condition>
+                </cmmn:ifPart>
+            </cmmn:sentry>
+            <cmmn:sentry id="sentryClosureEntry">
+                <cmmn:planItemOnPart sourceRef="planItemStagePayment">
+                    <cmmn:standardEvent>complete</cmmn:standardEvent>
+                </cmmn:planItemOnPart>
+            </cmmn:sentry>
+            <cmmn:sentry id="sentryCaseClosedEntry">
+                <cmmn:planItemOnPart sourceRef="planItemTaskNotifyCustomer">
+                    <cmmn:standardEvent>complete</cmmn:standardEvent>
+                </cmmn:planItemOnPart>
+            </cmmn:sentry>
+
+            <!-- Stages and Plan Item Definitions -->
+            <cmmn:stage id="stageTriage" name="Triage">
+                <cmmn:planItem id="planItemTaskReviewClaim" name="Review Claim Application" definitionRef="taskReviewClaim" />
+                <cmmn:planItem id="planItemTaskAssessComplexity" name="Assess Claim Complexity" definitionRef="taskAssessComplexity">
+                    <cmmn:entryCriterion id="entrySentryAssessComplexity" sentryRef="sentryAssessComplexityEntry" />
+                </cmmn:planItem>
+            </cmmn:stage>
+
+            <cmmn:stage id="stageInvestigation" name="Investigation">
+                <cmmn:planItem id="planItemTaskGatherDocuments" name="Gather Missing Documents" definitionRef="taskGatherDocuments">
+                    <cmmn:itemControl>
+                        <cmmn:repetitionRule>
+                            <cmmn:condition><![CDATA[${repetitionNeeded}]]></cmmn:condition>
+                        </cmmn:repetitionRule>
+                    </cmmn:itemControl>
+                </cmmn:planItem>
+                <cmmn:planItem id="planItemTaskAssessDamage" name="Assess Damages" definitionRef="taskAssessDamage">
+                    <cmmn:entryCriterion id="entrySentryAssessDamage" sentryRef="sentryAssessDamageEntry" />
+                </cmmn:planItem>
+            </cmmn:stage>
+
+            <cmmn:stage id="stageApproval" name="Approval">
+                <cmmn:planItem id="planItemTaskFinalApproval" name="Final Claim Approval" definitionRef="taskFinalApproval">
+                    <cmmn:entryCriterion id="entrySentryFinalApproval" sentryRef="sentryFinalApprovalEntry" />
+                </cmmn:planItem>
+            </cmmn:stage>
+
+            <cmmn:stage id="stagePayment" name="Payment">
+                <cmmn:planItem id="planItemTaskProcessPayment" name="Process Claim Payment" definitionRef="taskProcessPayment" />
+            </cmmn:stage>
+
+            <cmmn:stage id="stageClosure" name="Closure">
+                <cmmn:planItem id="planItemTaskNotifyCustomer" name="Notify Customer of Outcome" definitionRef="taskNotifyCustomer" />
+                <cmmn:planItem id="planItemMilestoneCaseClosed" name="Case Closed" definitionRef="milestoneCaseClosed">
+                    <cmmn:entryCriterion id="entrySentryCaseClosed" sentryRef="sentryCaseClosedEntry" />
+                </cmmn:planItem>
+            </cmmn:stage>
+
+            <cmmn:humanTask id="taskReviewClaim" name="Review Claim Application" flowable:assignee="${claimAdjuster}" />
+            <cmmn:decisionTask id="taskAssessComplexity" name="Assess Claim Complexity" decisionRef="ClaimDecisionTable" />
+            <cmmn:humanTask id="taskGatherDocuments" name="Gather Missing Documents" flowable:assignee="${claimAdjuster}" />
+            <cmmn:humanTask id="taskAssessDamage" name="Assess Damages" flowable:assignee="${damageAssessor}" />
+            <cmmn:humanTask id="taskFinalApproval" name="Final Claim Approval" flowable:candidateGroups="${approverGroup}" />
+            <cmmn:processTask id="taskProcessPayment" name="Process Claim Payment">
+                <cmmn:processRefExpression><![CDATA[ClaimPaymentProcess]]></cmmn:processRefExpression>
+            </cmmn:processTask>
+            <cmmn:humanTask id="taskNotifyCustomer" name="Notify Customer of Outcome" flowable:assignee="${claimAdjuster}" />
+            <cmmn:milestone id="milestoneCaseClosed" name="Case Closed" />
+
+        </cmmn:casePlanModel>
+    </cmmn:case>
+
+    <cmmndi:CMMNDI>
+        <cmmndi:CMMNDiagram id="CMMNDiagram_insuranceClaimCase">
+            <cmmndi:CMMNShape id="CMMNShape_casePlanModel" cmmnElementRef="casePlanModel">
+                <dc:Bounds height="800" width="1200" x="0" y="0" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            
+            <cmmndi:CMMNShape id="CMMNShape_planItemStageTriage" cmmnElementRef="planItemStageTriage">
+                <dc:Bounds height="200" width="250" x="50" y="50" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            <cmmndi:CMMNShape id="CMMNShape_planItemTaskReviewClaim" cmmnElementRef="planItemTaskReviewClaim">
+                <dc:Bounds height="80" width="100" x="75" y="80" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            <cmmndi:CMMNShape id="CMMNShape_planItemTaskAssessComplexity" cmmnElementRef="planItemTaskAssessComplexity">
+                <dc:Bounds height="80" width="100" x="75" y="180" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            
+            <cmmndi:CMMNShape id="CMMNShape_planItemStageInvestigation" cmmnElementRef="planItemStageInvestigation">
+                <dc:Bounds height="200" width="250" x="350" y="50" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            <cmmndi:CMMNShape id="CMMNShape_planItemTaskGatherDocuments" cmmnElementRef="planItemTaskGatherDocuments">
+                <dc:Bounds height="80" width="100" x="375" y="80" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            <cmmndi:CMMNShape id="CMMNShape_planItemTaskAssessDamage" cmmnElementRef="planItemTaskAssessDamage">
+                <dc:Bounds height="80" width="100" x="375" y="180" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            
+            <cmmndi:CMMNShape id="CMMNShape_planItemStageApproval" cmmnElementRef="planItemStageApproval">
+                <dc:Bounds height="200" width="250" x="650" y="50" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            <cmmndi:CMMNShape id="CMMNShape_planItemTaskFinalApproval" cmmnElementRef="planItemTaskFinalApproval">
+                <dc:Bounds height="80" width="100" x="675" y="110" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            
+            <cmmndi:CMMNShape id="CMMNShape_planItemStagePayment" cmmnElementRef="planItemStagePayment">
+                <dc:Bounds height="200" width="250" x="350" y="300" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            <cmmndi:CMMNShape id="CMMNShape_planItemTaskProcessPayment" cmmnElementRef="planItemTaskProcessPayment">
+                <dc:Bounds height="80" width="100" x="375" y="360" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+
+            <cmmndi:CMMNShape id="CMMNShape_planItemStageClosure" cmmnElementRef="planItemStageClosure">
+                <dc:Bounds height="200" width="250" x="650" y="300" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            <cmmndi:CMMNShape id="CMMNShape_planItemTaskNotifyCustomer" cmmnElementRef="planItemTaskNotifyCustomer">
+                <dc:Bounds height="80" width="100" x="675" y="330" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            <cmmndi:CMMNShape id="CMMNShape_planItemMilestoneCaseClosed" cmmnElementRef="planItemMilestoneCaseClosed">
+                <dc:Bounds height="80" width="100" x="675" y="430" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+        </cmmndi:CMMNDiagram>
+    </cmmndi:CMMNDI>
+
+</cmmn:definitions>

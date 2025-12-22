@@ -1,0 +1,187 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.ant-layout {
+  min-height: 100vh;
+}
+
+.logo {
+  height: 32px;
+  margin: 16px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.page-header {
+  background: #fff;
+  padding: 16px 24px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.page-content {
+  padding: 24px;
+  background: #fff;
+  margin: 24px;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.stats-card {
+  text-align: center;
+  padding: 24px;
+}
+
+.stats-number {
+  font-size: 32px;
+  font-weight: bold;
+  color: #1890ff;
+  margin-bottom: 8px;
+}
+
+.stats-title {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.table-toolbar-left {
+  display: flex;
+  gap: 8px;
+}
+
+.table-toolbar-right {
+  display: flex;
+  gap: 8px;
+}
+
+.form-container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.upload-area {
+  border: 2px dashed #d9d9d9;
+  border-radius: 6px;
+  padding: 40px;
+  text-align: center;
+  background: #fafafa;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.upload-area:hover {
+  border-color: #1890ff;
+}
+
+.upload-area.dragover {
+  border-color: #1890ff;
+  background: #e6f7ff;
+}
+
+.timeline-item-content {
+  padding-left: 16px;
+}
+
+.timeline-item-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.timeline-item-description {
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 14px;
+}
+
+.status-tag {
+  margin-right: 8px;
+}
+
+.severity-high {
+  color: #ff4d4f;
+}
+
+.severity-medium {
+  color: #faad14;
+}
+
+.severity-low {
+  color: #52c41a;
+}
+
+.amount-display {
+  font-weight: bold;
+  color: #1890ff;
+}
+
+.claim-number {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  color: #1890ff;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+}
+
+.error-boundary {
+  padding: 24px;
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 6px;
+  color: #ff4d4f;
+}
+
+@media (max-width: 768px) {
+  .page-content {
+    margin: 16px;
+    padding: 16px;
+  }
+  
+  .table-toolbar {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+}

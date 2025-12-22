@@ -1,0 +1,576 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:feel="https://www.omg.org/spec/DMN/20191111/FEEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="https://www.omg.org/spec/DMN/20191111/DC/"
+             id="definitions_1"
+             name="definitions"
+             namespace="http://flowable.org/dmn">
+
+  <decision id="ClaimDecisionTable" name="理赔决策表">
+
+    <decisionTable id="decisionTable_1" hitPolicy="FIRST" preferredOrientation="Rule-as-Row">
+
+      <!-- 输入条款 -->
+      <input id="input_policyType" label="保单类型">
+        <inputExpression id="inputExpression_policyType" typeRef="string">
+          <text>policyType</text>
+        </inputExpression>
+      </input>
+
+      <input id="input_claimedAmount" label="理赔金额">
+        <inputExpression id="inputExpression_claimedAmount" typeRef="double">
+          <text>claimedAmount</text>
+        </inputExpression>
+      </input>
+
+      <input id="input_coverageAmount" label="保额">
+        <inputExpression id="inputExpression_coverageAmount" typeRef="double">
+          <text>coverageAmount</text>
+        </inputExpression>
+      </input>
+
+      <input id="input_claimType" label="报案类别">
+        <inputExpression id="inputExpression_claimType" typeRef="string">
+          <text>claimType</text>
+        </inputExpression>
+      </input>
+
+      <input id="input_severity" label="严重性">
+        <inputExpression id="inputExpression_severity" typeRef="string">
+          <text>severity</text>
+        </inputExpression>
+      </input>
+
+      <!-- 输出条款 -->
+      <output id="output_paymentMethod" label="赔付方式" name="paymentMethod" typeRef="string" />
+      <output id="output_needInvestigation" label="是否升级调查" name="needInvestigation" typeRef="boolean" />
+      <output id="output_needManualReview" label="是否触发人工审核" name="needManualReview" typeRef="boolean" />
+      <output id="output_approvalLevel" label="审批级别" name="approvalLevel" typeRef="string" />
+      <output id="output_priority" label="优先级" name="priority" typeRef="string" />
+      <output id="output_claimComplexity" label="案件复杂度" name="claimComplexity" typeRef="string" />
+
+      <!-- 规则 -->
+      <rule id="rule_1">
+        <description>车险小额理赔，直接处理</description>
+        <inputEntry id="inputEntry_1_1">
+          <text>"车险"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_1_2">
+          <text>&lt;= 10000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_1_3">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_1_4">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_1_5">
+          <text>"LOW"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry_1_1">
+          <text>"快速赔付"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_1_2">
+          <text>false</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_1_3">
+          <text>false</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_1_4">
+          <text>"自动"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_1_5">
+          <text>"普通"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_1_6">
+          <text>"simple"</text>
+        </outputEntry>
+      </rule>
+
+      <rule id="rule_2">
+        <description>车险大额理赔，需要审核</description>
+        <inputEntry id="inputEntry_2_1">
+          <text>"车险"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_2_2">
+          <text>&gt; 10000 and &lt;= 50000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_2_3">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_2_4">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_2_5">
+          <text>"MEDIUM"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry_2_1">
+          <text>"标准赔付"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_2_2">
+          <text>false</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_2_3">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_2_4">
+          <text>"主管"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_2_5">
+          <text>"重要"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_2_6">
+          <text>"simple"</text>
+        </outputEntry>
+      </rule>
+
+      <rule id="rule_3">
+        <description>车险超大额理赔，需要调查和高级审核</description>
+        <inputEntry id="inputEntry_3_1">
+          <text>"车险"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_3_2">
+          <text>&gt; 50000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_3_3">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_3_4">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_3_5">
+          <text></text>
+        </inputEntry>
+        <outputEntry id="outputEntry_3_1">
+          <text>"分级赔付"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_3_2">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_3_3">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_3_4">
+          <text>"经理"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_3_5">
+          <text>"紧急"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_3_6">
+          <text>"complex"</text>
+        </outputEntry>
+      </rule>
+
+      <rule id="rule_4">
+        <description>财产险小额理赔</description>
+        <inputEntry id="inputEntry_4_1">
+          <text>"财产险"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_4_2">
+          <text>&lt;= 20000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_4_3">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_4_4">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_4_5">
+          <text>"LOW"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry_4_1">
+          <text>"标准赔付"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_4_2">
+          <text>false</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_4_3">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_4_4">
+          <text>"主管"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_4_5">
+          <text>"普通"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_4_6">
+          <text>"simple"</text>
+        </outputEntry>
+      </rule>
+
+      <rule id="rule_5">
+        <description>财产险中额理赔</description>
+        <inputEntry id="inputEntry_5_1">
+          <text>"财产险"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_5_2">
+          <text>&gt; 20000 and &lt;= 100000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_5_3">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_5_4">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_5_5">
+          <text>"MEDIUM"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry_5_1">
+          <text>"分级赔付"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_5_2">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_5_3">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_5_4">
+          <text>"经理"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_5_5">
+          <text>"重要"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_5_6">
+          <text>"complex"</text>
+        </outputEntry>
+      </rule>
+
+      <rule id="rule_6">
+        <description>财产险大额理赔</description>
+        <inputEntry id="inputEntry_6_1">
+          <text>"财产险"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_6_2">
+          <text>&gt; 100000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_6_3">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_6_4">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_6_5">
+          <text></text>
+        </inputEntry>
+        <outputEntry id="outputEntry_6_1">
+          <text>"分级赔付"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_6_2">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_6_3">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_6_4">
+          <text>"总监"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_6_5">
+          <text>"紧急"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_6_6">
+          <text>"complex"</text>
+        </outputEntry>
+      </rule>
+
+      <rule id="rule_7">
+        <description>人身险小额理赔</description>
+        <inputEntry id="inputEntry_7_1">
+          <text>"人身险"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_7_2">
+          <text>&lt;= 30000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_7_3">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_7_4">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_7_5">
+          <text>"LOW"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry_7_1">
+          <text>"快速赔付"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_7_2">
+          <text>false</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_7_3">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_7_4">
+          <text>"主管"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_7_5">
+          <text>"普通"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_7_6">
+          <text>"simple"</text>
+        </outputEntry>
+      </rule>
+
+      <rule id="rule_8">
+        <description>人身险中额理赔</description>
+        <inputEntry id="inputEntry_8_1">
+          <text>"人身险"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_8_2">
+          <text>&gt; 30000 and &lt;= 200000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_8_3">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_8_4">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_8_5">
+          <text>"MEDIUM"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry_8_1">
+          <text>"分级赔付"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_8_2">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_8_3">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_8_4">
+          <text>"经理"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_8_5">
+          <text>"重要"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_8_6">
+          <text>"complex"</text>
+        </outputEntry>
+      </rule>
+
+      <rule id="rule_9">
+        <description>人身险大额理赔</description>
+        <inputEntry id="inputEntry_9_1">
+          <text>"人身险"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_9_2">
+          <text>&gt; 200000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_9_3">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_9_4">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_9_5">
+          <text></text>
+        </inputEntry>
+        <outputEntry id="outputEntry_9_1">
+          <text>"分级赔付"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_9_2">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_9_3">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_9_4">
+          <text>"总监"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_9_5">
+          <text>"紧急"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_9_6">
+          <text>"complex"</text>
+        </outputEntry>
+      </rule>
+
+      <rule id="rule_10">
+        <description>盗窃案件，必须调查</description>
+        <inputEntry id="inputEntry_10_1">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_10_2">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_10_3">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_10_4">
+          <text>"盗窃"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_10_5">
+          <text></text>
+        </inputEntry>
+        <outputEntry id="outputEntry_10_1">
+          <text>"标准赔付"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_10_2">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_10_3">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_10_4">
+          <text>"经理"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_10_5">
+          <text>"重要"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_10_6">
+          <text>"complex"</text>
+        </outputEntry>
+      </rule>
+
+      <rule id="rule_11">
+        <description>自然灾害案件</description>
+        <inputEntry id="inputEntry_11_1">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_11_2">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_11_3">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_11_4">
+          <text>"自然灾害"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_11_5">
+          <text></text>
+        </inputEntry>
+        <outputEntry id="outputEntry_11_1">
+          <text>"分级赔付"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_11_2">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_11_3">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_11_4">
+          <text>"经理"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_11_5">
+          <text>"紧急"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_11_6">
+          <text>"complex"</text>
+        </outputEntry>
+      </rule>
+
+      <rule id="rule_12">
+        <description>高严重性案件</description>
+        <inputEntry id="inputEntry_12_1">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_12_2">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_12_3">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_12_4">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_12_5">
+          <text>"HIGH", "CRITICAL"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry_12_1">
+          <text>"分级赔付"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_12_2">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_12_3">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_12_4">
+          <text>"总监"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_12_5">
+          <text>"紧急"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_12_6">
+          <text>"complex"</text>
+        </outputEntry>
+      </rule>
+
+      <rule id="rule_13">
+        <description>超出保额的案件</description>
+        <inputEntry id="inputEntry_13_1">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_13_2">
+          <text>&gt; coverageAmount</text>
+        </inputEntry>
+        <inputEntry id="inputEntry_13_3">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_13_4">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_13_5">
+          <text></text>
+        </inputEntry>
+        <outputEntry id="outputEntry_13_1">
+          <text>"按保额赔付"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_13_2">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_13_3">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_13_4">
+          <text>"经理"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_13_5">
+          <text>"重要"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_13_6">
+          <text>"complex"</text>
+        </outputEntry>
+      </rule>
+
+      <rule id="rule_14">
+        <description>默认规则</description>
+        <inputEntry id="inputEntry_14_1">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_14_2">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_14_3">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_14_4">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="inputEntry_14_5">
+          <text></text>
+        </inputEntry>
+        <outputEntry id="outputEntry_14_1">
+          <text>"标准赔付"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_14_2">
+          <text>false</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_14_3">
+          <text>true</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_14_4">
+          <text>"主管"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_14_5">
+          <text>"普通"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry_14_6">
+          <text>"simple"</text>
+        </outputEntry>
+      </rule>
+
+    </decisionTable>
+  </decision>
+
+</definitions>

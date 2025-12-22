@@ -1,0 +1,315 @@
+package com.flowable.demo.web.rest;
+
+import com.flowable.demo.web.rest.dto.TaskDTO;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.flowable.cmmn.api.CmmnTaskService;
+import org.flowable.engine.HistoryService;
+import org.flowable.engine.TaskService;
+import org.flowable.task.api.Task;
+import org.flowable.task.api.history.HistoricTaskInstance;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * 任务管理 REST API
+ */
+@RestController
+@RequestMapping("/tasks")
+@RequiredArgsConstructor
+@Slf4j
+@Tag(name = "任务管理", description = "Flowable 任务的管理操作")
+public class TaskResource {
+
+    private final CmmnTaskService cmmnTaskService;
+    private final TaskService taskService;
+    private final HistoryService historyService;
+
+    /**
+     * 获取我的待办任务
+     */
+    @GetMapping("/my-tasks")
+    @Operation(summary = "获取我的待办任务", description = "获取当前用户的待办任务列表")
+    public ResponseEntity<Page<TaskDTO>> getMyTasks(
+            @Parameter(description = "用户ID") @RequestParam String userId,
+            Pageable pageable) {
+        log.debug("REST request to get my tasks for user: {}", userId);
+        
+        List<Task> tasks = cmmnTaskService.createTaskQuery()
+                .taskAssignee(userId)
+                .orderByTaskCreateTime().desc()
+                .listPage((int) pageable.getOffset(), pageable.getPageSize());
+        
+        long total = cmmnTaskService.createTaskQuery()
+                .taskAssignee(userId)
+                .count();
+        
+        Page<TaskDTO> result = new PageImpl<>(
+                tasks.stream().map(this::convertToDTO).collect(Collectors.toList()),
+                pageable,
+                total
+        );
+        
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * 获取可认领的任务
+     */
+    @GetMapping("/claimable")
+    @Operation(summary = "获取可认领任务", description = "获取当前用户可以认领的任务列表")
+    public ResponseEntity<Page<TaskDTO>> getClaimableTasks(
+            @Parameter(description = "用户ID") @RequestParam String userId,
+            Pageable pageable) {
+        log.debug("REST request to get claimable tasks for user: {}", userId);
+        
+        List<Task> tasks = cmmnTaskService.createTaskQuery()
+                .taskCandidateUser(userId)
+                .active()
+                .orderByTaskCreateTime().desc()
+                .listPage((int) pageable.getOffset(), pageable.getPageSize());
+        
+        long total = cmmnTaskService.createTaskQuery()
+                .taskCandidateUser(userId)
+                .active()
+                .count();
+        
+        Page<TaskDTO> result = new PageImpl<>(
+                tasks.stream().map(this::convertToDTO).collect(Collectors.toList()),
+                pageable,
+                total
+        );
+        
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * 认领任务
+     */
+    @PostMapping("/{taskId}/claim")
+    @Operation(summary = "认领任务", description = "认领指定的任务")
+    public ResponseEntity<Void> claimTask(
+            @Parameter(description = "任务ID") @PathVariable String taskId,
+            @Parameter(description = "用户ID") @RequestParam String userId) {
+        log.debug("REST request to claim task {} for user: {}", taskId, userId);
+        
+        try {
+            cmmnTaskService.claim(taskId, userId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Failed to claim task {}: {}", taskId, e.getMessage());
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
+     * 取消认领任务
+     */
+    @PostMapping("/{taskId}/unclaim")
+    @Operation(summary = "取消认领任务", description = "取消认领指定的任务")
+    public ResponseEntity<Void> unclaimTask(
+            @Parameter(description = "任务ID") @PathVariable String taskId) {
+        log.debug("REST request to unclaim task: {}", taskId);
+        
+        try {
+            cmmnTaskService.unclaim(taskId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Failed to unclaim task {}: {}", taskId, e.getMessage());
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
+     * 分配任务
+     */
+    @PostMapping("/{taskId}/assign")
+    @Operation(summary = "分配任务", description = "将任务分配给指定用户")
+    public ResponseEntity<Void> assignTask(
+            @Parameter(description = "任务ID") @PathVariable String taskId,
+            @Parameter(description = "用户ID") @RequestParam String userId) {
+        log.debug("REST request to assign task {} to user: {}", taskId, userId);
+        
+        try {
+            cmmnTaskService.setAssignee(taskId, userId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Failed to assign task {} to user {}: {}", taskId, userId, e.getMessage());
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
+     * 完成任务
+     */
+    @PostMapping("/{taskId}/complete")
+    @Operation(summary = "完成任务", description = "完成指定的任务")
+    public ResponseEntity<Void> completeTask(
+            @Parameter(description = "任务ID") @PathVariable String taskId,
+            @RequestBody(required = false) Map<String, Object> variables) {
+        log.debug("REST request to complete task: {}", taskId);
+        
+        try {
+            if (variables == null) {
+                variables = new HashMap<>();
+            }
+            cmmnTaskService.complete(taskId, variables);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Failed to complete task {}: {}", taskId, e.getMessage());
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
+     * 获取任务详情
+     */
+    @GetMapping("/{taskId}")
+    @Operation(summary = "获取任务详情", description = "根据ID获取任务的详细信息")
+    public ResponseEntity<TaskDTO> getTask(
+            @Parameter(description = "任务ID") @PathVariable String taskId) {
+        log.debug("REST request to get task: {}", taskId);
+        
+        Task task = cmmnTaskService.createTaskQuery()
+                .taskId(taskId)
+                .singleResult();
+        
+        if (task == null) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        return ResponseEntity.ok(convertToDTO(task));
+    }
+
+    /**
+     * 获取历史任务
+     */
+    @GetMapping("/history")
+    @Operation(summary = "获取历史任务", description = "获取用户的历史任务列表")
+    public ResponseEntity<Page<HistoricTaskInstance>> getHistoricTasks(
+            @Parameter(description = "用户ID") @RequestParam String userId,
+            Pageable pageable) {
+        log.debug("REST request to get historic tasks for user: {}", userId);
+        
+        List<HistoricTaskInstance> tasks = historyService.createHistoricTaskInstanceQuery()
+                .taskAssignee(userId)
+                .finished()
+                .orderByTaskCreateTime().desc()
+                .listPage((int) pageable.getOffset(), pageable.getPageSize());
+        
+        long total = historyService.createHistoricTaskInstanceQuery()
+                .taskAssignee(userId)
+                .finished()
+                .count();
+        
+        Page<HistoricTaskInstance> result = new PageImpl<>(tasks, pageable, total);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * 获取任务统计信息
+     */
+    @GetMapping("/statistics")
+    @Operation(summary = "获取任务统计", description = "获取任务的统计信息")
+    public ResponseEntity<Map<String, Object>> getTaskStatistics(
+            @Parameter(description = "用户ID") @RequestParam(required = false) String userId) {
+        log.debug("REST request to get task statistics for user: {}", userId);
+        
+        Map<String, Object> statistics = new HashMap<>();
+        
+        if (userId != null) {
+            // 我的待办任务数
+            long myTasksCount = cmmnTaskService.createTaskQuery()
+                    .taskAssignee(userId)
+                    .count();
+            statistics.put("myTasksCount", myTasksCount);
+            
+            // 可认领任务数
+            long claimableTasksCount = cmmnTaskService.createTaskQuery()
+                    .taskCandidateUser(userId)
+                    .active()
+                    .count();
+            statistics.put("claimableTasksCount", claimableTasksCount);
+            
+            // 今日完成任务数
+            Date todayStart = java.sql.Date.valueOf(java.time.LocalDate.now());
+            long todayCompletedCount = historyService.createHistoricTaskInstanceQuery()
+                    .taskAssignee(userId)
+                    .finished()
+                    .taskCompletedAfter(todayStart)
+                    .count();
+            statistics.put("todayCompletedCount", todayCompletedCount);
+        }
+        
+        // 总待办任务数
+        long totalActiveTasks = cmmnTaskService.createTaskQuery()
+                .active()
+                .count();
+        statistics.put("totalActiveTasks", totalActiveTasks);
+        
+        return ResponseEntity.ok(statistics);
+    }
+
+    /**
+     * 转换为 DTO
+     */
+    private TaskDTO convertToDTO(Task task) {
+        TaskDTO dto = new TaskDTO();
+        dto.setId(task.getId());
+        dto.setName(task.getName());
+        dto.setDescription(task.getDescription());
+        dto.setAssignee(task.getAssignee());
+        dto.setOwner(task.getOwner());
+        dto.setProcessInstanceId(task.getProcessInstanceId());
+        dto.setCaseInstanceId(task.getScopeId());
+        dto.setTaskDefinitionKey(task.getTaskDefinitionKey());
+        dto.setFormKey(task.getFormKey());
+        dto.setPriority(task.getPriority());
+        
+        // 转换日期类型
+        if (task.getCreateTime() != null) {
+            dto.setCreateTime(convertToLocalDateTime(task.getCreateTime()));
+        }
+        if (task.getDueDate() != null) {
+            dto.setDueDate(convertToLocalDateTime(task.getDueDate()));
+        }
+        
+        dto.setCategory(task.getCategory());
+        dto.setTenantId(task.getTenantId());
+        dto.setSuspended(task.isSuspended());
+        
+        // 获取候选用户和组
+        dto.setCandidateUsers(cmmnTaskService.getIdentityLinksForTask(task.getId()).stream()
+                .filter(link -> "candidate".equals(link.getType()) && link.getUserId() != null)
+                .map(link -> link.getUserId())
+                .collect(Collectors.toList()));
+        
+        dto.setCandidateGroups(cmmnTaskService.getIdentityLinksForTask(task.getId()).stream()
+                .filter(link -> "candidate".equals(link.getType()) && link.getGroupId() != null)
+                .map(link -> link.getGroupId())
+                .collect(Collectors.toList()));
+        
+        return dto;
+    }
+    
+    /**
+     * Date 转 LocalDateTime
+     */
+    private LocalDateTime convertToLocalDateTime(Date date) {
+        return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+    }
+}

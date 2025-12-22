@@ -1,0 +1,255 @@
+/* 全局样式 */
+.logo {
+  height: 32px;
+  margin: 16px;
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+  line-height: 32px;
+}
+
+.site-layout-background {
+  background: #fff;
+  min-height: 360px;
+}
+
+/* 表格工具栏 */
+.table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 0 4px;
+}
+
+.table-toolbar-left {
+  display: flex;
+  gap: 8px;
+}
+
+.table-toolbar-right {
+  display: flex;
+  gap: 8px;
+}
+
+/* 金额显示样式 */
+.amount-display {
+  font-weight: 600;
+  color: #1890ff;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+/* 理赔编号样式 */
+.claim-number {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-weight: 500;
+  color: #262626;
+}
+
+/* 加载容器 */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 400px;
+}
+
+/* 时间轴样式 */
+.timeline-item-content {
+  padding: 8px 0;
+}
+
+.timeline-item-title {
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 4px;
+}
+
+.timeline-item-description {
+  color: #595959;
+  margin-bottom: 8px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .table-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  
+  .table-toolbar-left,
+  .table-toolbar-right {
+    justify-content: center;
+  }
+}
+
+/* Ant Design 组件自定义样式 */
+.ant-layout-sider-collapsed .logo {
+  font-size: 14px;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: #f5f5f5;
+}
+
+.ant-card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+}
+
+.ant-btn-primary {
+  background: #1890ff;
+  border-color: #1890ff;
+}
+
+.ant-btn-primary:hover {
+  background: #40a9ff;
+  border-color: #40a9ff;
+}
+
+/* 状态标签样式 */
+.ant-tag {
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
+/* 表单样式 */
+.ant-form-item-label > label {
+  font-weight: 500;
+}
+
+/* 模态框样式 */
+.ant-modal-header {
+  background: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.ant-modal-title {
+  font-weight: 600;
+}
+
+/* 分页样式 */
+.ant-pagination {
+  text-align: right;
+  margin-top: 16px;
+}
+
+/* 搜索框样式 */
+.ant-input-search .ant-input-group .ant-input-affix-wrapper {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* 标签页样式 */
+.ant-tabs-tab {
+  font-weight: 500;
+}
+
+.ant-tabs-tab-active {
+  font-weight: 600;
+}
+
+/* 统计卡片样式 */
+.ant-statistic-title {
+  font-size: 14px;
+  color: #8c8c8c;
+}
+
+.ant-statistic-content {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+/* 描述列表样式 */
+.ant-descriptions-item-label {
+  font-weight: 500;
+  color: #262626;
+}
+
+.ant-descriptions-item-content {
+  color: #595959;
+}
+
+/* 时间轴自定义 */
+.ant-timeline-item-content {
+  padding-bottom: 20px;
+}
+
+/* 表格操作按钮样式 */
+.ant-btn-link {
+  padding: 0 4px;
+  height: auto;
+  line-height: 1.2;
+}
+
+/* 工具提示样式 */
+.ant-tooltip-inner {
+  background: rgba(0, 0, 0, 0.85);
+  border-radius: 4px;
+}
+
+/* 选择器样式 */
+.ant-select-selector {
+  border-radius: 6px;
+}
+
+/* 输入框样式 */
+.ant-input {
+  border-radius: 6px;
+}
+
+/* 按钮组样式 */
+.ant-space-item {
+  display: flex;
+  align-items: center;
+}
+
+/* 卡片标题样式 */
+.ant-card-head-title {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+/* 列表样式 */
+.ant-list-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.ant-list-item:last-child {
+  border-bottom: none;
+}
+
+/* 标签页内容样式 */
+.ant-tabs-content-holder {
+  padding-top: 16px;
+}
+
+/* 表格固定列样式 */
+.ant-table-fixed-left,
+.ant-table-fixed-right {
+  z-index: 1;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}

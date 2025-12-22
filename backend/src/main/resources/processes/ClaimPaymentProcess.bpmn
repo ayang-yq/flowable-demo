@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://flowable.org/bpmn">
+
+  <process id="ClaimPaymentProcess" name="理赔支付流程" isExecutable="true">
+    
+    <!-- 开始事件 -->
+    <startEvent id="startEvent_paymentStart" name="支付开始">
+      <extensionElements>
+        <flowable:formProperty id="amount" name="支付金额" type="long" required="true" />
+        <flowable:formProperty id="reference" name="支付参考号" type="string" required="true" />
+        <flowable:formProperty id="payeeName" name="收款人姓名" type="string" required="true" />
+      </extensionElements>
+    </startEvent>
+
+    <!-- 支付校验 -->
+    <userTask id="userTask_validatePayment" name="支付校验" flowable:assignee="${paymentOfficer}">
+      <extensionElements>
+        <flowable:formProperty id="amount" name="支付金额" type="long" readonly="true" />
+        <flowable:formProperty id="reference" name="支付参考号" type="string" readonly="true" />
+        <flowable:formProperty id="payeeName" name="收款人姓名" type="string" readonly="true" />
+        <flowable:formProperty id="validationResult" name="校验结果" type="enum" required="true">
+          <flowable:value id="approved" name="批准" />
+          <flowable:value id="rejected" name="拒绝" />
+        </flowable:formProperty>
+        <flowable:formProperty id="validationComment" name="校验备注" type="string" />
+      </extensionElements>
+    </userTask>
+
+    <!-- 排他网关：校验结果分支 -->
+    <exclusiveGateway id="gateway_validationResult" name="校验结果" />
+
+    <!-- 执行支付 -->
+    <serviceTask id="serviceTask_executePayment" name="执行支付" flowable:delegateExpression="${paymentService}">
+      <extensionElements>
+        <flowable:field name="amount">
+          <flowable:expression>${amount}</flowable:expression>
+        </flowable:field>
+        <flowable:field name="reference">
+          <flowable:expression>${reference}</flowable:expression>
+        </flowable:field>
+        <flowable:field name="payeeName">
+          <flowable:expression>${payeeName}</flowable:expression>
+        </flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <!-- 支付确认 -->
+    <userTask id="userTask_confirmPayment" name="支付确认" flowable:assignee="${paymentOfficer}">
+      <extensionElements>
+        <flowable:formProperty id="transactionId" name="交易ID" type="string" readonly="true" />
+        <flowable:formProperty id="amount" name="支付金额" type="long" readonly="true" />
+        <flowable:formProperty id="payeeName" name="收款人姓名" type="string" readonly="true" />
+        <flowable:formProperty id="paymentDate" name="支付日期" type="date" readonly="true" />
+        <flowable:formProperty id="confirmationResult" name="确认结果" type="enum" required="true">
+          <flowable:value id="confirmed" name="确认" />
+          <flowable:value id="disputed" name="争议" />
+        </flowable:formProperty>
+        <flowable:formProperty id="confirmationComment" name="确认备注" type="string" />
+      </extensionElements>
+    </userTask>
+
+    <!-- 支付被拒绝 -->
+    <userTask id="userTask_paymentRejected" name="支付被拒绝" flowable:assignee="${paymentOfficer}">
+      <extensionElements>
+        <flowable:formProperty id="rejectionReason" name="拒绝原因" type="string" required="true" />
+        <flowable:formProperty id="rejectionComment" name="拒绝备注" type="string" />
+      </extensionElements>
+    </userTask>
+
+    <!-- 更新 Case 状态 -->
+    <serviceTask id="serviceTask_updateCase" name="更新 Case 状态" flowable:delegateExpression="${caseService}">
+      <extensionElements>
+        <flowable:field name="caseInstanceId">
+          <flowable:expression>${caseInstanceId}</flowable:expression>
+        </flowable:field>
+        <flowable:field name="paymentStatus">
+          <flowable:expression>${paymentStatus}</flowable:expression>
+        </flowable:field>
+        <flowable:field name="transactionId">
+          <flowable:expression>${transactionId}</flowable:expression>
+        </flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <!-- 发送通知 -->
+    <serviceTask id="serviceTask_sendNotification" name="发送通知" flowable:delegateExpression="${notificationService}">
+      <extensionElements>
+        <flowable:field name="notificationType">
+          <flowable:expression>payment_completed</flowable:expression>
+        </flowable:field>
+        <flowable:field name="claimId">
+          <flowable:expression>${claimId}</flowable:expression>
+        </flowable:field>
+        <flowable:field name="paymentStatus">
+          <flowable:expression>${paymentStatus}</flowable:expression>
+        </flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <!-- 排他网关：确认结果分支 -->
+    <exclusiveGateway id="gateway_confirmationResult" name="确认结果" />
+
+    <!-- 支付争议处理 -->
+    <userTask id="userTask_handleDispute" name="处理支付争议" flowable:assignee="${paymentManager}">
+      <extensionElements>
+        <flowable:formProperty id="disputeResolution" name="争议解决方案" type="enum" required="true">
+          <flowable:value id="retry" name="重新支付" />
+          <flowable:value id="cancel" name="取消支付" />
+          <flowable:value id="investigate" name="调查" />
+        </flowable:formProperty>
+        <flowable:formProperty id="disputeComment" name="争议处理备注" type="string" />
+      </extensionElements>
+    </userTask>
+
+    <!-- 结束事件：支付成功 -->
+    <endEvent id="endEvent_paymentSuccess" name="支付成功">
+      <extensionElements>
+        <flowable:executionListener event="end" delegateExpression="${paymentCompletionListener}" />
+      </extensionElements>
+    </endEvent>
+
+    <!-- 结束事件：支付失败 -->
+    <endEvent id="endEvent_paymentFailed" name="支付失败">
+      <extensionElements>
+        <flowable:executionListener event="end" delegateExpression="${paymentFailureListener}" />
+      </extensionElements>
+    </endEvent>
+
+    <!-- 结束事件：支付争议 -->
+    <endEvent id="endEvent_paymentDisputed" name="支付争议">
+      <extensionElements>
+        <flowable:executionListener event="end" delegateExpression="${paymentDisputeListener}" />
+      </extensionElements>
+    </endEvent>
+
+    <!-- 序列流 -->
+    <sequenceFlow id="flow_start_to_validate" sourceRef="startEvent_paymentStart" targetRef="userTask_validatePayment" />
+    
+    <sequenceFlow id="flow_validate_to_gateway" sourceRef="userTask_validatePayment" targetRef="gateway_validationResult" />
+    
+    <!-- 校验通过分支 -->
+    <sequenceFlow id="flow_validate_approved" sourceRef="gateway_validationResult" targetRef="serviceTask_executePayment">
+      <conditionExpression xsi:type="tFormalExpression">${validationResult == 'approved'}</conditionExpression>
+    </sequenceFlow>
+    
+    <!-- 校验拒绝分支 -->
+    <sequenceFlow id="flow_validate_rejected" sourceRef="gateway_validationResult" targetRef="userTask_paymentRejected">
+      <conditionExpression xsi:type="tFormalExpression">${validationResult == 'rejected'}</conditionExpression>
+    </sequenceFlow>
+    
+    <sequenceFlow id="flow_execute_to_confirm" sourceRef="serviceTask_executePayment" targetRef="userTask_confirmPayment" />
+    
+    <sequenceFlow id="flow_confirm_to_gateway" sourceRef="userTask_confirmPayment" targetRef="gateway_confirmationResult" />
+    
+    <!-- 确认分支 -->
+    <sequenceFlow id="flow_confirm_confirmed" sourceRef="gateway_confirmationResult" targetRef="serviceTask_updateCase">
+      <conditionExpression xsi:type="tFormalExpression">${confirmationResult == 'confirmed'}</conditionExpression>
+    </sequenceFlow>
+    
+    <!-- 争议分支 -->
+    <sequenceFlow id="flow_confirm_disputed" sourceRef="gateway_confirmationResult" targetRef="userTask_handleDispute">
+      <conditionExpression xsi:type="tFormalExpression">${confirmationResult == 'disputed'}</conditionExpression>
+    </sequenceFlow>
+    
+    <sequenceFlow id="flow_rejected_to_updateCase" sourceRef="userTask_paymentRejected" targetRef="serviceTask_updateCase" />
+    
+    <sequenceFlow id="flow_updateCase_to_notification" sourceRef="serviceTask_updateCase" targetRef="serviceTask_sendNotification" />
+    
+    <!-- 争议处理后分支 -->
+    <sequenceFlow id="flow_dispute_to_success" sourceRef="userTask_handleDispute" targetRef="endEvent_paymentSuccess">
+      <conditionExpression xsi:type="tFormalExpression">${disputeResolution == 'retry'}</conditionExpression>
+    </sequenceFlow>
+    
+    <sequenceFlow id="flow_dispute_to_failed" sourceRef="userTask_handleDispute" targetRef="endEvent_paymentFailed">
+      <conditionExpression xsi:type="tFormalExpression">${disputeResolution == 'cancel'}</conditionExpression>
+    </sequenceFlow>
+    
+    <sequenceFlow id="flow_dispute_to_disputed" sourceRef="userTask_handleDispute" targetRef="endEvent_paymentDisputed">
+      <conditionExpression xsi:type="tFormalExpression">${disputeResolution == 'investigate'}</conditionExpression>
+    </sequenceFlow>
+    
+    <!-- 支付成功路径 -->
+    <sequenceFlow id="flow_notification_to_success" sourceRef="serviceTask_sendNotification" targetRef="endEvent_paymentSuccess">
+      <conditionExpression xsi:type="tFormalExpression">${paymentStatus == 'completed'}</conditionExpression>
+    </sequenceFlow>
+    
+    <!-- 支付失败路径 -->
+    <sequenceFlow id="flow_notification_to_failed" sourceRef="serviceTask_sendNotification" targetRef="endEvent_paymentFailed">
+      <conditionExpression xsi:type="tFormalExpression">${paymentStatus == 'failed'}</conditionExpression>
+    </sequenceFlow>
+
+  </process>
+
+</definitions>

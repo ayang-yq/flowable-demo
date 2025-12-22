@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(find:*)",
+      "Bash(xargs ls:*)",
+      "Bash(tree:*)",
+      "Bash(mvn clean compile:*)",
+      "Bash(mvn:*)",
+      "Bash(./mvnw:*)"
+    ]
+  }
+}
