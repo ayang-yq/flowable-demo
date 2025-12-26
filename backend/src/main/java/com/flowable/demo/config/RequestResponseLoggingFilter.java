@@ -57,21 +57,21 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
             log.info("Method: {}", request.getMethod());
             log.info("URI: {}", request.getRequestURI());
             log.info("Query String: {}", request.getQueryString());
-            log.info("Remote Address: {}", request.getRemoteAddr());
-            log.info("User-Agent: {}", request.getHeader("User-Agent"));
-            log.info("Content-Type: {}", request.getContentType());
-            log.info("Content-Length: {}", request.getContentLength());
+            //log.info("Remote Address: {}", request.getRemoteAddr());
+            //log.info("User-Agent: {}", request.getHeader("User-Agent"));
+            //log.info("Content-Type: {}", request.getContentType());
+            //log.info("Content-Length: {}", request.getContentLength());
 
             // 记录请求头
-            log.info("Headers:");
-            request.getHeaderNames().asIterator().forEachRemaining(headerName -> {
-                String headerValue = request.getHeader(headerName);
-                if (!"Authorization".equalsIgnoreCase(headerName)) {
-                    log.info("  {}: {}", headerName, headerValue);
-                } else {
-                    log.info("  {}: [REDACTED]", headerName);
-                }
-            });
+            //log.info("Headers:");
+            //request.getHeaderNames().asIterator().forEachRemaining(headerName -> {
+            //    String headerValue = request.getHeader(headerName);
+            //    if (!"Authorization".equalsIgnoreCase(headerName)) {
+            //        log.info("  {}: {}", headerName, headerValue);
+            //    } else {
+            //        log.info("  {}: [REDACTED]", headerName);
+            //    }
+            //});
 
             // 记录请求体（仅对非文件上传请求）
             if (request.getContentType() != null && !request.getContentType().contains("multipart/form-data") &&
@@ -100,10 +100,10 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
             log.info("Processing Time: {} ms", duration);
 
             // 记录响应头
-            log.info("Headers:");
-            for (String headerName : response.getHeaderNames()) {
-                log.info("  {}: {}", headerName, response.getHeader(headerName));
-            }
+            //log.info("Headers:");
+            //for (String headerName : response.getHeaderNames()) {
+            //    log.info("  {}: {}", headerName, response.getHeader(headerName));
+            //}
 
             // 记录响应体（仅对JSON响应且长度合理）
             if (response.getContentType() != null && response.getContentType().contains("application/json") &&

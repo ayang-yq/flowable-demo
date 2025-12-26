@@ -77,33 +77,6 @@ flowable:
   dmn:
     deploy-resources: true
 
-# 日志配置
-logging:
-  level:
-    com.flowable.demo: DEBUG
-    org.flowable: INFO
-    org.flowable.job: WARN
-    org.flowable.engine.impl.asyncexecutor: WARN
-    org.flowable.engine.impl.cmd: WARN
-    org.flowable.engine.impl.interceptor: WARN
-    org.flowable.engine.impl.persistence.entity: WARN
-    org.flowable.cmmn.engine.impl: WARN
-    org.flowable.bpmn.engine.impl: WARN
-    org.springframework.security: WARN
-    org.hibernate.SQL: WARN
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-  file:
-    name: logs/insurance-claim-system.log
-  logback:
-    rollingpolicy:
-      max-file-size: 10MB
-      max-history: 30
-      total-size-cap: 1GB
-      file-name-pattern: logs/insurance-claim-system-%d{yyyy-MM-dd}.%i.log
-
 # Swagger/OpenAPI 配置
 springdoc:
   api-docs:
@@ -155,16 +128,3 @@ spring:
     hibernate:
       ddl-auto: validate
 
-logging:
-  level:
-    root: INFO
-    com.flowable.demo: INFO
-    org.flowable: WARN
-  file:
-    name: logs/insurance-claim-system-prod.log
-  logback:
-    rollingpolicy:
-      max-file-size: 50MB
-      max-history: 90
-      total-size-cap: 5GB
-      file-name-pattern: logs/insurance-claim-system-prod-%d{yyyy-MM-dd}.%i.log

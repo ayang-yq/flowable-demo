@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.flowable.cmmn.api.repository.CaseDefinition;
 import org.flowable.cmmn.api.repository.CmmnDeployment;
+import org.flowable.dmn.api.DmnDecision;
 import org.flowable.dmn.api.DmnDeployment;
 import org.flowable.engine.repository.Deployment;
 import org.flowable.engine.repository.ProcessDefinition;
@@ -67,7 +68,7 @@ public class AdminStatisticsService {
     private AdminStatisticsDTO.ModelStatistics getModelStatistics() {
         List<CaseDefinition> caseDefinitions = repositoryAdapter.getAllCaseDefinitions();
         List<ProcessDefinition> processDefinitions = repositoryAdapter.getAllProcessDefinitions();
-        List<DmnDeployment> dmnDeployments = repositoryAdapter.getDmnDeployments();
+        List<DmnDecision> dmnDecisions = repositoryAdapter.getAllDmnDecisionTables();
 
         // 按 Key 去重统计
         long cmmnCount = caseDefinitions.stream()
@@ -80,8 +81,10 @@ public class AdminStatisticsService {
                 .distinct()
                 .count();
 
-        // For DMN, count deployments since DMN doesn't have definitions in the same way
-        long dmnCount = dmnDeployments.size();
+        long dmnCount = dmnDecisions.stream()
+                .map(DmnDecision::getKey)
+                .distinct()
+                .count();
 
         log.info("Model statistics - CMMN: {}, BPMN: {}, DMN: {}", cmmnCount, bpmnCount, dmnCount);
 

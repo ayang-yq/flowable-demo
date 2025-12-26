@@ -31,10 +31,12 @@ flowable-demo/
 │   │   │   └── web/           # Admin REST API
 │   │   └── config/            # 配置类
 │   └── src/main/resources/
-│       ├── processes/          # Flowable 流程定义
-│       │   ├── ClaimCase.cmmn
-│       │   ├── ClaimPaymentProcess.bpmn
+│       ├── cases/              # CMMN Case 定义
+│       │   └── ClaimCase.cmmn
+│       ├── dmn/                # DMN 决策表
 │       │   └── ClaimDecisionTable.dmn
+│       ├── processes/          # BPMN 流程定义
+│       │   └── ClaimPaymentProcess.bpmn
 │       └── application.yml    # 配置文件
 ├── frontend/                  # React 前端
 │   ├── src/

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Spring Boot default configurations -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <!-- Property definitions -->
+    <property name="LOG_PATH" value="logs"/>
+    <property name="LOG_FILE" value="${LOG_PATH}/insurance-claim-system.log"/>
+    
+    <!-- Development profile -->
+    <springProfile name="dev">
+        <property name="LOG_FILE" value="${LOG_PATH}/insurance-claim-system.log"/>
+    </springProfile>
+    
+    <!-- Production profile -->
+    <springProfile name="prod">
+        <property name="LOG_FILE" value="${LOG_PATH}/insurance-claim-system-prod.log"/>
+    </springProfile>
+
+    <!-- File appender that truncates file on each start -->
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${LOG_FILE}</file>
+        <append>false</append>
+        
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Development profile log levels -->
+    <springProfile name="dev">
+        <logger name="com.flowable.demo" level="DEBUG"/>
+        <logger name="org.flowable" level="INFO"/>
+        <logger name="org.flowable.job" level="WARN"/>
+        <logger name="org.flowable.engine.impl.asyncexecutor" level="WARN"/>
+        <logger name="org.flowable.engine.impl.cmd" level="WARN"/>
+        <logger name="org.flowable.engine.impl.interceptor" level="WARN"/>
+        <logger name="org.flowable.engine.impl.persistence.entity" level="WARN"/>
+        <logger name="org.flowable.cmmn.engine.impl" level="WARN"/>
+        <logger name="org.flowable.cmmn.engine.impl.d.CaseDefinitionDiagramHelper" level="ERROR"/>
+        <logger name="org.flowable.bpmn.engine.impl" level="WARN"/>
+        <logger name="org.springframework.security" level="WARN"/>
+        <logger name="org.hibernate.SQL" level="WARN"/>
+        <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="TRACE"/>
+    </springProfile>
+    
+    <!-- Production profile log levels -->
+    <springProfile name="prod">
+        <logger name="root" level="INFO"/>
+        <logger name="com.flowable.demo" level="INFO"/>
+        <logger name="org.flowable" level="WARN"/>
+        <logger name="org.flowable.cmmn.engine.impl.d.CaseDefinitionDiagramHelper" level="ERROR"/>
+    </springProfile>
+
+    <!-- Root logger -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>

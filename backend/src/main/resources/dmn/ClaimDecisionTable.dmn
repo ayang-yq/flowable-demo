@@ -95,7 +95,7 @@
           <text>"车险"</text>
         </inputEntry>
         <inputEntry id="inputEntry_2_2">
-          <text>&gt; 10000 and &lt;= 50000</text>
+          <text><![CDATA[${claimedAmount > 10000 && claimedAmount <= 50000}]]></text>
         </inputEntry>
         <inputEntry id="inputEntry_2_3">
           <text></text>
@@ -206,7 +206,7 @@
           <text>"财产险"</text>
         </inputEntry>
         <inputEntry id="inputEntry_5_2">
-          <text>&gt; 20000 and &lt;= 100000</text>
+          <text><![CDATA[${claimedAmount > 20000 && claimedAmount <= 100000}]]></text>
         </inputEntry>
         <inputEntry id="inputEntry_5_3">
           <text></text>
@@ -317,7 +317,7 @@
           <text>"人身险"</text>
         </inputEntry>
         <inputEntry id="inputEntry_8_2">
-          <text>&gt; 30000 and &lt;= 200000</text>
+          <text><![CDATA[${claimedAmount > 30000 && claimedAmount <= 200000}]]></text>
         </inputEntry>
         <inputEntry id="inputEntry_8_3">
           <text></text>

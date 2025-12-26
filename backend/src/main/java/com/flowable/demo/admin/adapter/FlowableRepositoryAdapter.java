@@ -8,6 +8,7 @@ import org.flowable.cmmn.api.repository.CmmnDeployment;
 import org.flowable.cmmn.api.repository.CmmnDeploymentBuilder;
 import org.flowable.cmmn.model.CmmnModel;
 import org.flowable.dmn.api.DmnRepositoryService;
+import org.flowable.dmn.api.DmnDecision;
 import org.flowable.dmn.api.DmnDeployment;
 import org.flowable.dmn.api.DmnDeploymentBuilder;
 import org.flowable.engine.RepositoryService;
@@ -274,6 +275,22 @@ public class FlowableRepositoryAdapter {
             return deployments;
         } catch (Exception e) {
             log.error("Error getting DMN deployments", e);
+            return List.of();
+        }
+    }
+
+    /**
+     * 获取 DMN 决策表
+     */
+    public List<DmnDecision> getAllDmnDecisionTables() {
+        try {
+            List<DmnDecision> decisions = dmnRepositoryService.createDecisionQuery()
+                    .orderByDecisionKey().asc()
+                    .list();
+            log.info("Found {} DMN decision tables", decisions.size());
+            return decisions;
+        } catch (Exception e) {
+            log.error("Error getting DMN decision tables", e);
             return List.of();
         }
     }
