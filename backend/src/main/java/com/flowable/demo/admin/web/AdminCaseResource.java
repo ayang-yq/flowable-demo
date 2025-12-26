@@ -4,6 +4,7 @@ import com.flowable.demo.admin.service.CaseRuntimeService;
 import com.flowable.demo.admin.service.CaseMigrationService;
 import com.flowable.demo.admin.web.dto.CaseInstanceDTO;
 import com.flowable.demo.admin.web.dto.CaseOperationRequest;
+import com.flowable.demo.admin.web.dto.CmmnCaseVisualizationDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -178,5 +179,22 @@ public class AdminCaseResource {
         Map<String, Object> result = caseMigrationService.fixExistingCasesBusinessKey();
 
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * 获取 CMMN 可视化数据
+     * 参考 Flowable UI 6.8 设计，提供模型 XML 和运行态数据
+     * 
+     * @param caseInstanceId Case 实例 ID
+     * @return CMMN 可视化 DTO（包含 XML 和 Plan Item 状态）
+     */
+    @GetMapping("/{caseInstanceId}/visualization")
+    public ResponseEntity<CmmnCaseVisualizationDTO> getCaseVisualization(
+            @PathVariable String caseInstanceId) {
+        log.info("Get case visualization: {}", caseInstanceId);
+
+        CmmnCaseVisualizationDTO visualization = caseRuntimeService.getCaseVisualizationData(caseInstanceId);
+
+        return ResponseEntity.ok(visualization);
     }
 }

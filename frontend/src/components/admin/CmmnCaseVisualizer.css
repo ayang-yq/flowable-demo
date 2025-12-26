@@ -1,0 +1,340 @@
+/* CMMN Case Visualizer Styles */
+
+/* 容器样式 */
+.cmmn-visualizer-container {
+  position: relative;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+/* CMMN Viewer */
+.cmmn-viewer {
+  width: 100%;
+  height: calc(100% - 120px); /* 减去图例和工具栏的高度 */
+  border-top: 1px solid #dee2e6;
+}
+
+/* 加载状态 */
+.cmmn-visualizer-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #6c757d;
+}
+
+.cmmn-visualizer-loading p {
+  margin-top: 1rem;
+  margin-bottom: 0;
+}
+
+/* 错误状态 */
+.cmmn-visualizer-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #dc3545;
+}
+
+.cmmn-visualizer-error i {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.cmmn-visualizer-error p {
+  margin-bottom: 1rem;
+}
+
+/* 状态图例 */
+.cmmn-state-legend {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.legend-title {
+  font-weight: 600;
+  margin-right: 1rem;
+  color: #495057;
+}
+
+.legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  color: #495057;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 2px solid;
+}
+
+/* 图例颜色 */
+.legend-active {
+  background-color: rgba(40, 167, 69, 0.2);
+  border-color: #28a745;
+}
+
+.legend-available {
+  background-color: rgba(108, 117, 125, 0.2);
+  border-color: #6c757d;
+}
+
+.legend-completed {
+  background-color: rgba(108, 117, 125, 0.3);
+  border-color: #6c757d;
+  position: relative;
+}
+
+.legend-completed::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  color: #28a745;
+  font-weight: bold;
+}
+
+.legend-terminated {
+  background-color: rgba(220, 53, 69, 0.2);
+  border-color: #dc3545;
+}
+
+.legend-suspended {
+  background-color: rgba(255, 193, 7, 0.2);
+  border-color: #ffc107;
+}
+
+/* 工具栏 */
+.cmmn-visualizer-toolbar {
+  position: absolute;
+  top: 60px; /* 图例下方 */
+  right: 10px;
+  z-index: 100;
+}
+
+/* ==================== Plan Item 状态高亮 ==================== */
+
+/* 通用状态样式 */
+.cmmn-viewer .djs-element.plan-item-active,
+.cmmn-viewer .djs-element.plan-item-available,
+.cmmn-viewer .djs-element.plan-item-completed,
+.cmmn-viewer .djs-element.plan-item-terminated,
+.cmmn-viewer .djs-element.plan-item-suspended {
+  transition: all 0.3s ease;
+}
+
+/* Active 状态 - 绿色高亮边框 */
+.djs-element.plan-item-active .djs-visual rect,
+.djs-element.plan-item-active .djs-visual polygon,
+.djs-element.plan-item-active .djs-visual circle,
+.djs-element.plan-item-active .djs-visual path,
+.djs-element.plan-item-active .djs-outline {
+  stroke: #28a745 !important;
+  stroke-width: 3px !important;
+}
+
+.djs-element.plan-item-active:hover .djs-visual rect,
+.djs-element.plan-item-active:hover .djs-visual polygon,
+.djs-element.plan-item-active:hover .djs-visual circle,
+.djs-element.plan-item-active:hover .djs-visual path,
+.djs-element.plan-item-active:hover .djs-outline {
+  stroke-width: 4px !important;
+}
+
+/* Available 状态 - 灰色边框 */
+.djs-element.plan-item-available .djs-visual rect,
+.djs-element.plan-item-available .djs-visual polygon,
+.djs-element.plan-item-available .djs-visual circle,
+.djs-element.plan-item-available .djs-visual path,
+.djs-element.plan-item-available .djs-outline {
+  stroke: #6c757d !important;
+  stroke-width: 2px !important;
+  stroke-dasharray: 5, 3 !important;
+  opacity: 0.8;
+}
+
+.djs-element.plan-item-available:hover .djs-visual rect,
+.djs-element.plan-item-available:hover .djs-visual polygon,
+.djs-element.plan-item-available:hover .djs-visual circle,
+.djs-element.plan-item-available:hover .djs-visual path,
+.djs-element.plan-item-available:hover .djs-outline {
+  stroke-width: 3px !important;
+  opacity: 1;
+}
+
+/* Completed 状态 - 灰色 + 完成标识 */
+.djs-element.plan-item-completed .djs-visual rect,
+.djs-element.plan-item-completed .djs-visual polygon,
+.djs-element.plan-item-completed .djs-visual circle,
+.djs-element.plan-item-completed .djs-visual path,
+.djs-element.plan-item-completed .djs-outline {
+  stroke: #6c757d !important;
+  stroke-width: 2px !important;
+  opacity: 0.7;
+}
+
+/* Terminated 状态 - 红色 */
+.djs-element.plan-item-terminated .djs-visual rect,
+.djs-element.plan-item-terminated .djs-visual polygon,
+.djs-element.plan-item-terminated .djs-visual circle,
+.djs-element.plan-item-terminated .djs-visual path,
+.djs-element.plan-item-terminated .djs-outline {
+  stroke: #dc3545 !important;
+  stroke-width: 3px !important;
+  opacity: 0.6;
+}
+
+.djs-element.plan-item-terminated .djs-visual text {
+  fill: #dc3545 !important;
+}
+
+/* Suspended 状态 - 黄色 */
+.djs-element.plan-item-suspended .djs-visual rect,
+.djs-element.plan-item-suspended .djs-visual polygon,
+.djs-element.plan-item-suspended .djs-visual circle,
+.djs-element.plan-item-suspended .djs-visual path,
+.djs-element.plan-item-suspended .djs-outline {
+  stroke: #ffc107 !important;
+  stroke-width: 3px !important;
+}
+
+.djs-element.plan-item-suspended .djs-visual rect,
+.djs-element.plan-item-suspended .djs-visual polygon,
+.djs-element.plan-item-suspended .djs-visual circle {
+  fill: rgba(255, 193, 7, 0.1) !important;
+}
+
+/* ==================== Stage 特殊处理 ==================== */
+
+/* Stage 背景色 */
+.djs-element.plan-item-active[data-type="cmmn:Stage"] .djs-visual rect {
+  fill: rgba(40, 167, 69, 0.05) !important;
+}
+
+.djs-element.plan-item-completed[data-type="cmmn:Stage"] .djs-visual rect {
+  fill: rgba(108, 117, 125, 0.05) !important;
+}
+
+.djs-element.plan-item-terminated[data-type="cmmn:Stage"] .djs-visual rect {
+  fill: rgba(220, 53, 69, 0.05) !important;
+}
+
+.djs-element.plan-item-suspended[data-type="cmmn:Stage"] .djs-visual rect {
+  fill: rgba(255, 193, 7, 0.05) !important;
+}
+
+/* ==================== Milestone 特殊处理 ==================== */
+
+/* Milestone 圆形 */
+.djs-element.plan-item-active[data-type="cmmn:Milestone"] .djs-visual circle {
+  fill: rgba(40, 167, 69, 0.3) !important;
+}
+
+.djs-element.plan-item-completed[data-type="cmmn:Milestone"] .djs-visual circle {
+  fill: rgba(40, 167, 69, 0.5) !important;
+}
+
+/* ==================== Human Task 特殊处理 ==================== */
+
+/* Human Task 圆角矩形 */
+.djs-element.plan-item-active[data-type="cmmn:HumanTask"] .djs-visual rect,
+.djs-element.plan-item-active[data-type="cmmn:ProcessTask"] .djs-visual rect {
+  fill: rgba(40, 167, 69, 0.05) !important;
+}
+
+.djs-element.plan-item-completed[data-type="cmmn:HumanTask"] .djs-visual rect,
+.djs-element.plan-item-completed[data-type="cmmn:ProcessTask"] .djs-visual rect {
+  fill: rgba(108, 117, 125, 0.05) !important;
+}
+
+/* ==================== Sentry 可见性增强 ==================== */
+
+/* Sentry 元素 - 入口/出口条件标记 */
+/* 确保 Sentry 元素可见并具有 distinctive 样式 */
+.cmmn-viewer .djs-element[data-type="cmmn:Sentry"] {
+  opacity: 1 !important;
+}
+
+.cmmn-viewer .djs-element[data-type="cmmn:Sentry"] .djs-visual circle,
+.cmmn-viewer .djs-element[data-type="cmmn:Sentry"] .djs-visual polygon,
+.cmmn-viewer .djs-element[data-type="cmmn:Sentry"] .djs-visual path {
+  stroke: #6c757d !important;
+  stroke-width: 2px !important;
+  fill: #fff !important;
+}
+
+/* Sentry 入口条件 */
+.cmmn-viewer .djs-element[data-type="cmmn:EntryCriterion"] .djs-visual circle,
+.cmmn-viewer .djs-element[data-type="cmmn:EntryCriterion"] .djs-visual polygon,
+.cmmn-viewer .djs-element[data-type="cmmn:EntryCriterion"] .djs-visual path {
+  stroke: #007bff !important;
+  stroke-width: 2px !important;
+  fill: rgba(0, 123, 255, 0.1) !important;
+}
+
+/* Sentry 出口条件 */
+.cmmn-viewer .djs-element[data-type="cmmn:ExitCriterion"] .djs-visual circle,
+.cmmn-viewer .djs-element[data-type="cmmn:ExitCriterion"] .djs-visual polygon,
+.cmmn-viewer .djs-element[data-type="cmmn:ExitCriterion"] .djs-visual path {
+  stroke: #dc3545 !important;
+  stroke-width: 2px !important;
+  fill: rgba(220, 53, 69, 0.1) !important;
+}
+
+/* Sentry 边缘连接线 */
+.cmmn-viewer .djs-element[data-type="cmmn:SentryConnection"] .djs-visual path,
+.cmmn-viewer .djs-edge.sentry-connection .djs-visual path {
+  stroke: #6c757d !important;
+  stroke-width: 1.5px !important;
+  stroke-dasharray: 3, 3 !important;
+  opacity: 0.8 !important;
+}
+
+/* 确保 Sentry 元素在悬停时有视觉反馈 */
+.cmmn-viewer .djs-element[data-type="cmmn:Sentry"]:hover .djs-visual circle,
+.cmmn-viewer .djs-element[data-type="cmmn:EntryCriterion"]:hover .djs-visual circle,
+.cmmn-viewer .djs-element[data-type="cmmn:ExitCriterion"]:hover .djs-visual circle {
+  stroke-width: 3px !important;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.3));
+}
+
+/* ==================== 响应式调整 ==================== */
+
+@media (max-width: 768px) {
+  .cmmn-state-legend {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .legend-items {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .legend-item {
+    font-size: 0.8125rem;
+  }
+}

@@ -1,11 +1,20 @@
 package com.flowable.demo.admin.service;
 
 import com.flowable.demo.admin.adapter.FlowableCmmnAdapter;
+import com.flowable.demo.admin.adapter.FlowableRepositoryAdapter;
 import com.flowable.demo.admin.model.PlanItemTreeNode;
 import com.flowable.demo.admin.web.dto.CaseInstanceDTO;
+import com.flowable.demo.admin.web.dto.CmmnCaseVisualizationDTO;
+import com.flowable.demo.admin.web.dto.PlanItemStateDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.flowable.cmmn.api.CmmnRepositoryService;
+import org.flowable.cmmn.api.CmmnRuntimeService;
+import org.flowable.cmmn.api.CmmnHistoryService;
+import org.flowable.cmmn.api.history.HistoricPlanItemInstance;
+import org.flowable.cmmn.api.repository.CaseDefinition;
 import org.flowable.cmmn.api.runtime.CaseInstance;
+import org.flowable.cmmn.api.runtime.PlanItemInstance;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -14,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Case 运行态管理服务
@@ -26,6 +37,10 @@ import java.util.Map;
 public class CaseRuntimeService {
 
     private final FlowableCmmnAdapter cmmnAdapter;
+    private final FlowableRepositoryAdapter repositoryAdapter;
+    private final CmmnRepositoryService cmmnRepositoryService;
+    private final CmmnRuntimeService cmmnRuntimeService;
+    private final CmmnHistoryService cmmnHistoryService;
 
     // ==================== Case 查询 ====================
 
@@ -167,5 +182,119 @@ public class CaseRuntimeService {
             return null;
         }
         return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+    }
+
+    // ==================== CMMN 可视化 ====================
+
+    /**
+     * 获取 CMMN 可视化数据
+     * 参考 Flowable UI 6.8 设计，提供模型 XML 和运行态数据
+     *
+     * @param caseInstanceId Case 实例 ID
+     * @return CMMN 可视化 DTO（包含 XML 和 Plan Item 状态）
+     */
+    public CmmnCaseVisualizationDTO getCaseVisualizationData(String caseInstanceId) {
+        log.info("Getting CMMN visualization data for case instance: {}", caseInstanceId);
+
+        // 1. 获取 Case 实例
+        CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceQuery()
+                .caseInstanceId(caseInstanceId)
+                .singleResult();
+
+        if (caseInstance == null) {
+            throw new RuntimeException("Case instance not found: " + caseInstanceId);
+        }
+
+        // 2. 获取 CMMN XML
+        CaseDefinition caseDefinition = cmmnRepositoryService.createCaseDefinitionQuery()
+                .caseDefinitionId(caseInstance.getCaseDefinitionId())
+                .singleResult();
+
+        // 从部署资源中获取 CMMN XML
+        String cmmnXml = repositoryAdapter.getCaseDefinitionResourceContent(
+                caseDefinition.getDeploymentId(),
+                caseDefinition.getResourceName()
+        );
+
+        // 3. 获取运行态 Plan Items
+        List<PlanItemInstance> runtimePlanItems = cmmnRuntimeService.createPlanItemInstanceQuery()
+                .caseInstanceId(caseInstanceId)
+                .list();
+
+        // 4. 获取历史 Plan Items（用于已完成节点的展示）
+        List<HistoricPlanItemInstance> historicPlanItems = cmmnHistoryService.createHistoricPlanItemInstanceQuery()
+                .planItemInstanceCaseInstanceId(caseInstanceId)
+                .list();
+
+        // 5. 合并运行态和历史态数据
+        List<PlanItemStateDTO> allPlanItems = mergePlanItems(runtimePlanItems, historicPlanItems);
+
+        return CmmnCaseVisualizationDTO.builder()
+                .caseInstanceId(caseInstanceId)
+                .caseDefinitionId(caseInstance.getCaseDefinitionId())
+                .cmmnXml(cmmnXml)
+                .planItems(allPlanItems)
+                .build();
+    }
+
+    /**
+     * 合并运行态和历史态 Plan Items
+     * 优先使用运行态数据，补充历史态数据
+     */
+    private List<PlanItemStateDTO> mergePlanItems(
+            List<PlanItemInstance> runtimePlanItems,
+            List<HistoricPlanItemInstance> historicPlanItems) {
+
+        Map<String, PlanItemStateDTO> mergedMap = runtimePlanItems.stream()
+                .collect(Collectors.toMap(
+                        PlanItemInstance::getElementId,
+                        this::convertRuntimePlanItem,
+                        (existing, replacement) -> existing
+                ));
+
+        // 补充历史态数据（运行态中不存在的）
+        for (HistoricPlanItemInstance historicItem : historicPlanItems) {
+            String elementId = historicItem.getElementId();
+            if (!mergedMap.containsKey(elementId)) {
+                mergedMap.put(elementId, convertHistoricPlanItem(historicItem));
+            }
+        }
+
+        return mergedMap.values().stream()
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 转换运行态 Plan Item 为 DTO
+     */
+    private PlanItemStateDTO convertRuntimePlanItem(PlanItemInstance planItem) {
+        return PlanItemStateDTO.builder()
+                .id(planItem.getId())
+                .planItemDefinitionId(planItem.getElementId())
+                .name(planItem.getName())
+                .type(planItem.getPlanItemDefinitionType())
+                .state(planItem.getState())
+                .stageInstanceId(planItem.getStageInstanceId())
+                .createTime(toLocalDateTime(planItem.getCreateTime()))
+                .completedTime(toLocalDateTime(planItem.getCompletedTime()))
+                .terminatedTime(toLocalDateTime(planItem.getTerminatedTime()))
+                .build();
+    }
+
+    /**
+     * 转换历史态 Plan Item 为 DTO
+     */
+    private PlanItemStateDTO convertHistoricPlanItem(HistoricPlanItemInstance planItem) {
+        return PlanItemStateDTO.builder()
+                .id(planItem.getId())
+                .planItemDefinitionId(planItem.getElementId())
+                .name(planItem.getName())
+                .type(planItem.getPlanItemDefinitionType())
+                .state(planItem.getState())
+                .stageInstanceId(planItem.getStageInstanceId())
+                .createTime(toLocalDateTime(planItem.getCreateTime()))
+                .completedTime(toLocalDateTime(planItem.getCompletedTime()))
+                .terminatedTime(toLocalDateTime(planItem.getTerminatedTime()))
+                .build();
     }
 }

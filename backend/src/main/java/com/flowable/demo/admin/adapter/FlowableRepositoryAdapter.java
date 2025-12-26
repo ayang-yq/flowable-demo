@@ -133,6 +133,23 @@ public class FlowableRepositoryAdapter {
         }
     }
 
+    /**
+     * 获取 CMMN 定义资源内容（通过部署 ID 和资源名称）
+     */
+    public String getCaseDefinitionResourceContent(String deploymentId, String resourceName) {
+        try {
+            byte[] resourceBytes = cmmnRepositoryService.getResourceAsStream(
+                    deploymentId,
+                    resourceName).readAllBytes();
+
+            return new String(resourceBytes, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            log.error("Failed to read CMMN resource content for deployment: {}, resource: {}",
+                    deploymentId, resourceName, e);
+            return null;
+        }
+    }
+
     // ==================== BPMN 相关 ====================
 
     /**

@@ -148,6 +148,25 @@ export interface AdminStatisticsDTO {
     processes: Record<string, number>;
 }
 
+export interface CmmnCaseVisualizationDTO {
+    caseInstanceId: string;
+    caseDefinitionId: string;
+    cmmnXml: string;
+    planItems: PlanItemStateDTO[];
+}
+
+export interface PlanItemStateDTO {
+    id: string;
+    planItemDefinitionId: string;
+    name: string;
+    type: string;
+    state: 'active' | 'available' | 'completed' | 'terminated' | 'suspended';
+    stageInstanceId?: string;
+    createTime: string;
+    completedTime?: string;
+    terminatedTime?: string;
+}
+
 export interface PageResponse<T> {
     content: T[];
     totalElements: number;
@@ -237,6 +256,13 @@ export const caseApi = {
      */
     triggerPlanItem: (caseInstanceId: string, planItemInstanceId: string) =>
         adminApi.post(`/cases/${caseInstanceId}/plan-items/${planItemInstanceId}/trigger`),
+
+    /**
+     * 获取 CMMN 可视化数据
+     * 参考 Flowable UI 6.8 设计，提供模型 XML 和运行态数据
+     */
+    getCaseVisualization: (caseInstanceId: string) =>
+        adminApi.get<CmmnCaseVisualizationDTO>(`/cases/${caseInstanceId}/visualization`),
 };
 
 // Process Management API

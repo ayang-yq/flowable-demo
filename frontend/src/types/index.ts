@@ -143,3 +143,24 @@ export interface ErrorResponse {
   details?: string;
   timestamp: string;
 }
+
+// ==================== CMMN Visualization Types ====================
+
+export interface PlanItemState {
+  id: string;
+  planItemDefinitionId: string;  // 对应 CMMN XML 中的 elementId
+  name: string;
+  type: string;  // HUMAN_TASK, STAGE, MILESTONE, etc.
+  state: 'active' | 'available' | 'completed' | 'terminated' | 'suspended';
+  stageInstanceId?: string;
+  createTime: string;
+  completedTime?: string;
+  terminatedTime?: string;
+}
+
+export interface CmmnCaseVisualization {
+  caseInstanceId: string;
+  caseDefinitionId: string;
+  cmmnXml: string;
+  planItems: PlanItemState[];
+}

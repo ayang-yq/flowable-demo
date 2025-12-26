@@ -422,7 +422,7 @@ graph TB
 - `PUT /api/users/{id}` - 更新用户
 - `POST /api/users/{id}/roles` - 分配角色
 
-### **Admin 管理** (NEW)
+### **Admin 管理 & CMMN 可视化** (NEW)
 
 #### 模型管理
 - `GET /api/admin/models` - 查询模型列表(支持类型筛选)
@@ -432,6 +432,10 @@ graph TB
 #### Case 运行态管理
 - `GET /api/admin/cases` - 查询 Case 实例列表(支持多条件筛选)
 - `GET /api/admin/cases/{caseInstanceId}` - 获取 Case 实例详情(包含 Plan Item Tree)
+- `GET /api/admin/cases/{caseInstanceId}/visualization` - 获取 CMMN 可视化数据(CMMN XML + Plan Item 状态)
+  - 返回 CMMN XML 用于 cmmn-js 渲染
+  - 返回所有 PlanItem 实例状态（运行态 + 历史态）
+  - 支持 Stage、Milestone、HumanTask 等所有 PlanItem 类型
 - `POST /api/admin/cases/{caseInstanceId}/terminate` - 终止 Case
 - `POST /api/admin/cases/{caseInstanceId}/suspend` - 挂起 Case
 - `POST /api/admin/cases/{caseInstanceId}/resume` - 恢复 Case
@@ -447,6 +451,213 @@ graph TB
 
 #### 统计分析
 - `GET /api/admin/statistics` - 获取系统统计信息(模型、部署、Case、Process)
+
+### **CMMN Case 可视化功能** (NEW)
+
+基于 **Flowable UI 6.8 设计思路**，实现了轻量级的 CMMN Case 运行状态可视化功能。
+
+#### 设计原则
+
+1. **前后端分离架构**
+   - 后端：提供 CMMN XML 和运行态 PlanItem 状态数据
+   - 前端：使用 cmmn-js 渲染模型并应用状态高亮
+
+2. **静态模型 + 动态状态**
+   - 静态模型：CMMN XML（通过 cmmn-js 渲染）
+   - 动态状态：PlanItemInstance 数据（运行态 + 历史态）
+
+3. **状态映射规则**
+
+| PlanItem State | UI 表现 | CSS Class |
+| -------------- | ------- | --------- |
+| `active` | 绿色高亮边框 + 阴影 | `plan-item-active` |
+| `available` | 灰色虚线边框 | `plan-item-available` |
+| `completed` | 灰色边框 + 完成标识 ✓ | `plan-item-completed` |
+| `terminated` | 红色边框 + 半透明 | `plan-item-terminated` |
+| `suspended` | 黄色边框 + 淡色填充 | `plan-item-suspended` |
+
+#### 核心组件
+
+##### 后端：`CmmnCaseVisualizationDTO`
+
+```java
+public class CmmnCaseVisualizationDTO {
+    private String caseInstanceId;
+    private String caseDefinitionId;
+    private String cmmnXml;              // CMMN XML 用于 cmmn-js
+    private List<PlanItemStateDTO> planItems;  // 所有 PlanItem 状态
+}
+```
+
+##### 后端：`PlanItemStateDTO`
+
+```java
+public class PlanItemStateDTO {
+    private String id;
+    private String planItemDefinitionId;  // 对应 CMMN XML elementId
+    private String name;
+    private String type;                 // HUMAN_TASK, STAGE, MILESTONE, etc.
+    private String state;                // active, available, completed, etc.
+    private String stageInstanceId;
+    private String createTime;
+    private String completedTime;
+    private String terminatedTime;
+}
+```
+
+##### 前端：`CmmnCaseVisualizer` 组件
+
+```tsx
+interface CmmnCaseVisualizerProps {
+  caseInstanceId: string;
+  height?: string;
+  onPlanItemClick?: (planItem: PlanItemState) => void;
+}
+```
+
+**核心功能：**
+1. 使用 cmmn-js `NavigatedViewer` 渲染 CMMN 模型
+2. 根据 `planItemDefinitionId` 映射到 SVG 元素 `data-element-id`
+3. 根据状态应用对应的 CSS class
+4. 支持点击节点查看 PlanItem 详情
+
+#### 状态高亮逻辑
+
+```typescript
+// 核心算法
+const applyStateHighlights = (planItems: PlanItemState[]) => {
+  const elementRegistry = cmmnViewer.get('elementRegistry');
+  
+  // 创建映射表
+  const stateMap = new Map<string, PlanItemState>();
+  planItems.forEach(item => {
+    stateMap.set(item.planItemDefinitionId, item);
+  });
+  
+  // 遍历所有 SVG 元素并应用状态
+  elementRegistry.getAll().forEach((element) => {
+    const elementId = element.businessObject.id;
+    const planItemState = stateMap.get(elementId);
+    
+    if (planItemState) {
+      const gfx = elementRegistry.getGraphics(element);
+      gfx.classList.add(getStateClass(planItemState.state));
+    }
+  });
+};
+```
+
+#### 特殊处理
+
+1. **Stage 节点**
+   - 根据自身状态高亮
+   - 背景色根据状态变化
+   - 支持子节点嵌套展示
+
+2. **Milestone 节点**
+   - 达成后显示为 completed 状态
+   - 圆形填充颜色更明显
+
+3. **HumanTask / ProcessTask**
+   - 圆角矩形样式
+   - active 状态带绿色填充
+
+#### 使用方式
+
+**在 Case 详情页中使用：**
+
+```tsx
+import { CmmnCaseVisualizer } from './CmmnCaseVisualizer';
+
+<CmmnCaseVisualizer
+  caseInstanceId={caseInstanceId}
+  height="600px"
+  onPlanItemClick={(planItem) => {
+    // 显示 PlanItem 详情弹窗
+    Modal.info({
+      title: `Plan Item: ${planItem.name}`,
+      content: <PlanItemDetail planItem={planItem} />
+    });
+  }}
+/>
+```
+
+#### CSS 样式示例
+
+```css
+/* Active 状态 - 绿色高亮 */
+.plan-item-active > .djs-visual > * {
+  stroke: #28a745 !important;
+  stroke-width: 3px !important;
+  filter: drop-shadow(0 0 4px rgba(40, 167, 69, 0.4));
+}
+
+/* Completed 状态 - 灰色 + 完成标识 */
+.plan-item-completed > .djs-visual > * {
+  stroke: #6c757d !important;
+  stroke-width: 2px !important;
+  opacity: 0.7;
+}
+
+/* Terminated 状态 - 红色 */
+.plan-item-terminated > .djs-visual > * {
+  stroke: #dc3545 !important;
+  stroke-width: 3px !important;
+  opacity: 0.6;
+}
+
+/* Suspended 状态 - 黄色 */
+.plan-item-suspended > .djs-visual > * {
+  stroke: #ffc107 !important;
+  stroke-width: 3px !important;
+}
+```
+
+#### 与 Flowable UI 6.8 的对比
+
+| 特性 | Flowable UI 6.8 | 本实现 |
+|------|---------------|--------|
+| 模型渲染 | 自定义 SVG 库 | cmmn-js（标准） |
+| 状态数据 | 后端生成高亮结果 | 后端只提供原始数据 |
+| 状态高亮 | 后端注入 SVG | 前端 CSS class |
+| 扩展性 | 依赖官方 UI | 完全可定制 |
+| 依赖重量 | 重（包含整套 UI） | 轻量（仅可视化） |
+
+#### 后续扩展方向
+
+1. **Case Timeline**
+   - 展示 Case 执行时间线
+   - 显示 PlanItem 启动/完成时间
+
+2. **Sentry 解释**
+   - 可视化显示 Sentry 触发条件
+   - 解释为什么某个 PlanItem 被激活
+
+3. **实时更新**
+   - WebSocket 推送状态变化
+   - 实时刷新模型视图
+
+4. **交互操作**
+   - 在模型上直接触发 PlanItem
+   - 拖拽调整 Case 流程
+
+#### 架构优势
+
+1. **清晰的职责分离**
+   - 后端：数据提供者
+   - 前端：表现层逻辑
+
+2. **易于测试**
+   - 后端 API 独立测试
+   - 前端组件可单元测试
+
+3. **技术栈可控**
+   - 不依赖 Flowable UI 的技术栈
+   - 可使用任意前端框架
+
+4. **可移植性强**
+   - 后端 API 可被任何客户端使用
+   - 前端可替换为其他可视化库
 
 ## 🎯 演示数据
 
@@ -471,8 +682,11 @@ graph TB
 #### 功能特性
 - **模型管理**: 查询、部署 CMMN/BPMN/DMN 模型
 - **Case 管理**: 查询、监控、操作 Case 实例
+  - CMMN 模型可视化（使用 cmmn-js）
+  - Plan Item 运行状态高亮显示
+  - Plan Item Tree 树形视图
 - **Process 管理**: 查询、监控、操作 Process 实例
-- **可视化**: Plan Item Tree、BPMN 流程图高亮
+  - BPMN 流程图高亮显示
 - **统计分析**: 系统运行状态统计
 
 #### API 端点
@@ -485,6 +699,7 @@ POST   /api/admin/models/deploy             - 部署模型
 # Case 管理
 GET    /api/admin/cases                     - 查询 Case 列表
 GET    /api/admin/cases/{id}                - 获取 Case 详情
+GET    /api/admin/cases/{id}/visualization  - 获取 CMMN 可视化数据
 POST   /api/admin/cases/{id}/terminate      - 终止 Case
 
 # Process 管理

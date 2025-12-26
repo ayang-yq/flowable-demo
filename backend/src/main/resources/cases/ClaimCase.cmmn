@@ -10,10 +10,9 @@
     <cmmn:case id="insuranceClaimCase" name="Insurance Claim Case" flowable:initiatorVariableName="initiator">
         <cmmn:casePlanModel id="casePlanModel" name="Insurance Claim Plan Model">
 
-            <!-- Plan Items -->
             <cmmn:planItem id="planItemStageTriage" name="Triage" definitionRef="stageTriage" />
             <cmmn:planItem id="planItemStageInvestigation" name="Investigation" definitionRef="stageInvestigation">
-                <cmmn:entryCriterion id="entrySentryInvestigation" sentryRef="sentryInvestigationEntry" />
+               <cmmn:entryCriterion id="entrySentryInvestigation" sentryRef="sentryInvestigationEntry" />
             </cmmn:planItem>
             <cmmn:planItem id="planItemStageApproval" name="Approval" definitionRef="stageApproval">
                 <cmmn:entryCriterion id="entrySentryApproval" sentryRef="sentryApprovalEntry" />
@@ -26,7 +25,6 @@
                 <cmmn:entryCriterion id="entrySentryClosure" sentryRef="sentryClosureEntry" />
             </cmmn:planItem>
             
-            <!-- Sentries -->
             <cmmn:sentry id="sentryAssessComplexityEntry">
                 <cmmn:planItemOnPart sourceRef="planItemTaskReviewClaim">
                     <cmmn:standardEvent>complete</cmmn:standardEvent>
@@ -70,7 +68,7 @@
                 <cmmn:planItemOnPart sourceRef="planItemTaskFinalApproval">
                     <cmmn:standardEvent>complete</cmmn:standardEvent>
                 </cmmn:planItemOnPart>
-                 <cmmn:ifPart>
+                <cmmn:ifPart>
                     <cmmn:condition><![CDATA[${approved == true}]]></cmmn:condition>
                 </cmmn:ifPart>
             </cmmn:sentry>
@@ -85,11 +83,10 @@
                 </cmmn:planItemOnPart>
             </cmmn:sentry>
 
-            <!-- Stages and Plan Item Definitions -->
             <cmmn:stage id="stageTriage" name="Triage">
                 <cmmn:planItem id="planItemTaskReviewClaim" name="Review Claim Application" definitionRef="taskReviewClaim" />
                 <cmmn:planItem id="planItemTaskAssessComplexity" name="Assess Claim Complexity" definitionRef="taskAssessComplexity">
-                    <cmmn:entryCriterion id="entrySentryAssessComplexity" sentryRef="sentryAssessComplexityEntry" />
+                     <cmmn:entryCriterion id="entrySentryAssessComplexity" sentryRef="sentryAssessComplexityEntry" />
                 </cmmn:planItem>
             </cmmn:stage>
 
@@ -140,25 +137,37 @@
     <cmmndi:CMMNDI>
         <cmmndi:CMMNDiagram id="CMMNDiagram_insuranceClaimCase">
             <cmmndi:CMMNShape id="CMMNShape_casePlanModel" cmmnElementRef="casePlanModel">
-                <dc:Bounds height="800" width="1200" x="0" y="0" />
+                <dc:Bounds height="700" width="1000" x="0" y="0" />
                 <cmmndi:CMMNLabel />
             </cmmndi:CMMNShape>
             
             <cmmndi:CMMNShape id="CMMNShape_planItemStageTriage" cmmnElementRef="planItemStageTriage">
-                <dc:Bounds height="200" width="250" x="50" y="50" />
+                <dc:Bounds height="250" width="250" x="50" y="50" />
                 <cmmndi:CMMNLabel />
             </cmmndi:CMMNShape>
+             <cmmndi:CMMNShape id="CMMNShape_planItemStageInvestigation" cmmnElementRef="planItemStageInvestigation">
+                <dc:Bounds height="250" width="250" x="350" y="50" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            <cmmndi:CMMNShape id="CMMNShape_planItemStageApproval" cmmnElementRef="planItemStageApproval">
+                <dc:Bounds height="250" width="250" x="650" y="50" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            <cmmndi:CMMNShape id="CMMNShape_planItemStagePayment" cmmnElementRef="planItemStagePayment">
+                <dc:Bounds height="250" width="250" x="350" y="350" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            <cmmndi:CMMNShape id="CMMNShape_planItemStageClosure" cmmnElementRef="planItemStageClosure">
+                <dc:Bounds height="250" width="250" x="650" y="350" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            
             <cmmndi:CMMNShape id="CMMNShape_planItemTaskReviewClaim" cmmnElementRef="planItemTaskReviewClaim">
                 <dc:Bounds height="80" width="100" x="75" y="80" />
                 <cmmndi:CMMNLabel />
             </cmmndi:CMMNShape>
             <cmmndi:CMMNShape id="CMMNShape_planItemTaskAssessComplexity" cmmnElementRef="planItemTaskAssessComplexity">
                 <dc:Bounds height="80" width="100" x="75" y="180" />
-                <cmmndi:CMMNLabel />
-            </cmmndi:CMMNShape>
-            
-            <cmmndi:CMMNShape id="CMMNShape_planItemStageInvestigation" cmmnElementRef="planItemStageInvestigation">
-                <dc:Bounds height="200" width="250" x="350" y="50" />
                 <cmmndi:CMMNLabel />
             </cmmndi:CMMNShape>
             <cmmndi:CMMNShape id="CMMNShape_planItemTaskGatherDocuments" cmmnElementRef="planItemTaskGatherDocuments">
@@ -169,37 +178,138 @@
                 <dc:Bounds height="80" width="100" x="375" y="180" />
                 <cmmndi:CMMNLabel />
             </cmmndi:CMMNShape>
-            
-            <cmmndi:CMMNShape id="CMMNShape_planItemStageApproval" cmmnElementRef="planItemStageApproval">
-                <dc:Bounds height="200" width="250" x="650" y="50" />
-                <cmmndi:CMMNLabel />
-            </cmmndi:CMMNShape>
             <cmmndi:CMMNShape id="CMMNShape_planItemTaskFinalApproval" cmmnElementRef="planItemTaskFinalApproval">
                 <dc:Bounds height="80" width="100" x="675" y="110" />
                 <cmmndi:CMMNLabel />
             </cmmndi:CMMNShape>
-            
-            <cmmndi:CMMNShape id="CMMNShape_planItemStagePayment" cmmnElementRef="planItemStagePayment">
-                <dc:Bounds height="200" width="250" x="350" y="300" />
-                <cmmndi:CMMNLabel />
-            </cmmndi:CMMNShape>
             <cmmndi:CMMNShape id="CMMNShape_planItemTaskProcessPayment" cmmnElementRef="planItemTaskProcessPayment">
-                <dc:Bounds height="80" width="100" x="375" y="360" />
-                <cmmndi:CMMNLabel />
-            </cmmndi:CMMNShape>
-
-            <cmmndi:CMMNShape id="CMMNShape_planItemStageClosure" cmmnElementRef="planItemStageClosure">
-                <dc:Bounds height="200" width="250" x="650" y="300" />
+                <dc:Bounds height="80" width="100" x="375" y="410" />
                 <cmmndi:CMMNLabel />
             </cmmndi:CMMNShape>
             <cmmndi:CMMNShape id="CMMNShape_planItemTaskNotifyCustomer" cmmnElementRef="planItemTaskNotifyCustomer">
-                <dc:Bounds height="80" width="100" x="675" y="330" />
+                <dc:Bounds height="80" width="100" x="675" y="380" />
                 <cmmndi:CMMNLabel />
             </cmmndi:CMMNShape>
             <cmmndi:CMMNShape id="CMMNShape_planItemMilestoneCaseClosed" cmmnElementRef="planItemMilestoneCaseClosed">
-                <dc:Bounds height="80" width="100" x="675" y="430" />
+                <dc:Bounds height="80" width="100" x="675" y="480" />
                 <cmmndi:CMMNLabel />
             </cmmndi:CMMNShape>
+            
+            <cmmndi:CMMNShape id="CMMNShape_sentryAssessComplexityEntry" cmmnElementRef="entrySentryAssessComplexity">
+                <dc:Bounds height="28" width="18" x="116" y="166" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            
+            <cmmndi:CMMNShape id="CMMNShape_sentryInvestigationEntry" cmmnElementRef="entrySentryInvestigation">
+                <dc:Bounds height="28" width="18" x="341" y="161" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+
+            <cmmndi:CMMNShape id="CMMNShape_sentryAssessDamageEntry" cmmnElementRef="entrySentryAssessDamage">
+                <dc:Bounds height="28" width="18" x="416" y="166" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            
+            <cmmndi:CMMNShape id="CMMNShape_sentryApprovalEntry" cmmnElementRef="entrySentryApproval">
+                <dc:Bounds height="28" width="18" x="641" y="161" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+
+            <cmmndi:CMMNShape id="CMMNShape_sentryFinalApprovalEntry" cmmnElementRef="entrySentryFinalApproval">
+                <dc:Bounds height="28" width="18" x="666" y="136" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+
+            <cmmndi:CMMNShape id="CMMNShape_sentryApprovalExit" cmmnElementRef="exitSentryApproval">
+                <dc:Bounds height="28" width="18" x="891" y="161" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+
+            <cmmndi:CMMNShape id="CMMNShape_sentryPaymentEntry" cmmnElementRef="entrySentryPayment">
+                <dc:Bounds height="28" width="18" x="466" y="336" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+
+            <cmmndi:CMMNShape id="CMMNShape_sentryClosureEntry" cmmnElementRef="entrySentryClosure">
+                <dc:Bounds height="28" width="18" x="766" y="336" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+
+            <cmmndi:CMMNShape id="CMMNShape_sentryCaseClosedEntry" cmmnElementRef="entrySentryCaseClosed">
+                <dc:Bounds height="28" width="18" x="716" y="466" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNShape>
+            
+            <cmmndi:CMMNEdge id="CMMNEdge_sentryAssessComplexityEntry_taskReviewClaim" sourceCMMNElementRef="planItemTaskReviewClaim" targetCMMNElementRef="entrySentryAssessComplexity">
+                <di:waypoint x="125" y="160" />
+                <di:waypoint x="125" y="166" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNEdge>
+            
+            <cmmndi:CMMNEdge id="CMMNEdge_sentryInvestigationEntry_taskAssessComplexity" sourceCMMNElementRef="planItemTaskAssessComplexity" targetCMMNElementRef="entrySentryInvestigation">
+                <di:waypoint x="175" y="220" />
+                <di:waypoint x="258" y="220" />
+                <di:waypoint x="258" y="175" />
+                <di:waypoint x="341" y="175" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNEdge>
+            
+            <cmmndi:CMMNEdge id="CMMNEdge_sentryAssessDamageEntry_taskGatherDocuments" sourceCMMNElementRef="planItemTaskGatherDocuments" targetCMMNElementRef="entrySentryAssessDamage">
+                <di:waypoint x="425" y="160" />
+                <di:waypoint x="425" y="166" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNEdge>
+            
+            <cmmndi:CMMNEdge id="CMMNEdge_sentryApprovalEntry_taskAssessComplexity" sourceCMMNElementRef="planItemTaskAssessComplexity" targetCMMNElementRef="entrySentryApproval">
+                <di:waypoint x="175" y="220" />
+                <di:waypoint x="260" y="220" />
+                <di:waypoint x="260" y="320" />
+                <di:waypoint x="600" y="320" />
+                <di:waypoint x="600" y="175" />
+                <di:waypoint x="641" y="175" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNEdge>
+            
+            <cmmndi:CMMNEdge id="CMMNEdge_sentryFinalApprovalEntry_taskAssessDamage" sourceCMMNElementRef="planItemTaskAssessDamage" targetCMMNElementRef="entrySentryFinalApproval">
+                <di:waypoint x="475" y="220" />
+                <di:waypoint x="570" y="220" />
+                <di:waypoint x="570" y="150" />
+                <di:waypoint x="666" y="150" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNEdge>
+            
+            <cmmndi:CMMNEdge id="CMMNEdge_sentryApprovalExit_taskFinalApproval" sourceCMMNElementRef="planItemTaskFinalApproval" targetCMMNElementRef="exitSentryApproval">
+                <di:waypoint x="775" y="150" />
+                <di:waypoint x="830" y="150" />
+                <di:waypoint x="830" y="175" />
+                <di:waypoint x="891" y="175" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNEdge>
+            
+            <cmmndi:CMMNEdge id="CMMNEdge_sentryPaymentEntry_taskFinalApproval" sourceCMMNElementRef="planItemTaskFinalApproval" targetCMMNElementRef="entrySentryPayment">
+                <di:waypoint x="775" y="150" />
+                <di:waypoint x="800" y="150" />
+                <di:waypoint x="800" y="310" />
+                <di:waypoint x="475" y="310" />
+                <di:waypoint x="475" y="336" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNEdge>
+            
+            <cmmndi:CMMNEdge id="CMMNEdge_sentryClosureEntry_stagePayment" sourceCMMNElementRef="planItemStagePayment" targetCMMNElementRef="entrySentryClosure">
+                <di:waypoint x="600" y="475" />
+                <di:waypoint x="625" y="475" />
+                <di:waypoint x="625" y="300" />
+                <di:waypoint x="775" y="300" />
+                <di:waypoint x="775" y="336" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNEdge>
+            
+            <cmmndi:CMMNEdge id="CMMNEdge_sentryCaseClosedEntry_taskNotifyCustomer" sourceCMMNElementRef="planItemTaskNotifyCustomer" targetCMMNElementRef="entrySentryCaseClosed">
+                <di:waypoint x="725" y="460" />
+                <di:waypoint x="725" y="466" />
+                <cmmndi:CMMNLabel />
+            </cmmndi:CMMNEdge>
+
         </cmmndi:CMMNDiagram>
     </cmmndi:CMMNDI>
 

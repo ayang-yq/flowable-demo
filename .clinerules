@@ -31,7 +31,7 @@ Before starting any service, you must perform a port check and automatically cle
 - **Silent Operation**: Use `-ErrorAction SilentlyContinue` to prevent the workflow from breaking if a port is already empty.
 
 # Flowable models
-- **DO NOT modify the cmmn/bpmn/dmn model files**: don't modify the .cmmn/.bpmn/.dmn model files directly, give advice if there's any issue with the model file.
+- **cmmn/bpmn/dmn model files**: always confirm the changes before update these model files.
 
 # Document
 Always keep README.md up to date.

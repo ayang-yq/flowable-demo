@@ -23,6 +23,10 @@ import TaskList from './components/TaskList';
 import UserManagement from './components/UserManagement';
 import AdminDashboard from './components/admin/AdminDashboard';
 import CaseInstanceList from './components/admin/CaseInstanceList';
+import CaseInstanceDetail from './components/admin/CaseInstanceDetail';
+import ProcessInstanceList from './components/admin/ProcessInstanceList';
+import ProcessInstanceDetail from './components/admin/ProcessInstanceDetail';
+import ModelList from './components/admin/ModelList';
 import ModelDeployment from './components/admin/ModelDeployment';
 
 const { Header, Sider, Content } = Layout;
@@ -61,16 +65,23 @@ const AppContent: React.FC = () => {
       children: [
         {
           key: '/admin/dashboard',
-          label: 'Admin Dashboard',
+          label: 'Dashboard',
         },
         {
-          key: '/admin/cases',
-          label: 'Case 实例管理',
+          key: '/admin/models',
+          label: '模型管理',
         },
         {
           key: '/admin/models/deploy',
-          icon: <DeploymentUnitOutlined />,
           label: '模型部署',
+        },
+        {
+          key: '/admin/cases',
+          label: 'Case 实例',
+        },
+        {
+          key: '/admin/processes',
+          label: 'Process 实例',
         },
       ],
     },
@@ -149,8 +160,12 @@ const AppContent: React.FC = () => {
               <Route path="/tasks" element={<TaskList />} />
               <Route path="/users" element={<UserManagement />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/admin/cases" element={<CaseInstanceList />} />
+              <Route path="/admin/models" element={<ModelList />} />
               <Route path="/admin/models/deploy" element={<ModelDeployment />} />
+              <Route path="/admin/cases" element={<CaseInstanceList />} />
+              <Route path="/admin/cases/:caseInstanceId" element={<CaseInstanceDetail />} />
+              <Route path="/admin/processes" element={<ProcessInstanceList />} />
+              <Route path="/admin/processes/:processInstanceId" element={<ProcessInstanceDetail />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
