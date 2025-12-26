@@ -116,6 +116,7 @@ class CaseServiceTest {
         CaseInstance caseInstance = mock(CaseInstance.class);
         when(cmmnRuntimeService.createCaseInstanceBuilder()).thenReturn(caseInstanceBuilder);
         when(caseInstanceBuilder.caseDefinitionKey(anyString())).thenReturn(caseInstanceBuilder);
+        when(caseInstanceBuilder.businessKey(anyString())).thenReturn(caseInstanceBuilder);
         when(caseInstanceBuilder.name(anyString())).thenReturn(caseInstanceBuilder);
         when(caseInstanceBuilder.variables(anyMap())).thenReturn(caseInstanceBuilder);
         when(caseInstanceBuilder.start()).thenReturn(caseInstance);

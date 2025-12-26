@@ -6,6 +6,7 @@ import com.flowable.demo.domain.model.User;
 import com.flowable.demo.domain.repository.ClaimCaseRepository;
 import com.flowable.demo.domain.repository.InsurancePolicyRepository;
 import com.flowable.demo.domain.repository.UserRepository;
+import com.flowable.demo.web.rest.dto.ApproveRequestDTO;
 import com.flowable.demo.web.rest.dto.ClaimCaseDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -182,8 +183,8 @@ public class CaseService {
     /**
      * 批准理赔案件
      */
-    public ClaimCase approveClaimCase(UUID caseId, String userId) {
-        log.debug("Approving claim case {} by user {}", caseId, userId);
+    public ClaimCase approveClaimCase(UUID caseId, String userId, ApproveRequestDTO approveRequestDTO) {
+        log.debug("Approving claim case {} by user {} with amount {}", caseId, userId, approveRequestDTO.getApprovedAmount());
 
         ClaimCase claimCase = claimCaseRepository.findById(caseId)
                 .orElseThrow(() -> new IllegalArgumentException("Claim case not found"));
@@ -191,13 +192,17 @@ public class CaseService {
         User approvedBy = userRepository.findById(UUID.fromString(userId))
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // 设置批准金额（默认为索赔金额）
-        if (claimCase.getApprovedAmount() == null) {
-            claimCase.setApprovedAmount(claimCase.getClaimedAmount());
+        // 设置批准金额
+        claimCase.setApprovedAmount(approveRequestDTO.getApprovedAmount());
+
+        // 构建审批意见描述
+        String description = "Claim approved by " + approvedBy.getFullName();
+        if (approveRequestDTO.getComments() != null && !approveRequestDTO.getComments().isBlank()) {
+            description += " - " + approveRequestDTO.getComments();
         }
 
         // 更新状态为已批准
-        claimCase.updateStatus("APPROVED", "Claim approved by " + approvedBy.getFullName(), approvedBy);
+        claimCase.updateStatus("APPROVED", description, approvedBy);
         claimCaseRepository.save(claimCase);
 
         // 如果有 Case 实例，触发完成事件
@@ -208,12 +213,45 @@ public class CaseService {
                 variables.put("approved", true);
                 variables.put("approvedBy", approvedBy.getUsername());
                 variables.put("approvedDate", LocalDateTime.now().toString());
+                variables.put("approvedAmount", approveRequestDTO.getApprovedAmount());
                 
                 cmmnRuntimeService.setVariables(claimCase.getCaseInstanceId(), variables);
                 
                 log.info("Set approval variables for case instance {}", claimCase.getCaseInstanceId());
             } catch (Exception e) {
                 log.warn("Failed to set approval variables: {}", e.getMessage());
+            }
+        }
+
+        return claimCase;
+    }
+
+    /**
+     * 拒绝理赔案件
+     */
+    public ClaimCase rejectClaimCase(UUID caseId, String reason) {
+        log.debug("Rejecting claim case {} with reason: {}", caseId, reason);
+
+        ClaimCase claimCase = claimCaseRepository.findById(caseId)
+                .orElseThrow(() -> new IllegalArgumentException("Claim case not found"));
+
+        // 更新状态为已拒绝
+        claimCase.updateStatus("REJECTED", reason, claimCase.getCreatedBy());
+        claimCaseRepository.save(claimCase);
+
+        // 如果有 Case 实例，触发完成事件
+        if (claimCase.getCaseInstanceId() != null) {
+            try {
+                // 设置审批结果变量
+                Map<String, Object> variables = new HashMap<>();
+                variables.put("approved", false);
+                variables.put("rejectReason", reason);
+                
+                cmmnRuntimeService.setVariables(claimCase.getCaseInstanceId(), variables);
+                
+                log.info("Set rejection variables for case instance {}", claimCase.getCaseInstanceId());
+            } catch (Exception e) {
+                log.warn("Failed to set rejection variables: {}", e.getMessage());
             }
         }
 
@@ -316,6 +354,7 @@ public class CaseService {
         try {
             Map<String, Object> variables = new HashMap<>();
             variables.put("claimCaseId", claimCase.getId().toString());
+            variables.put("claimNumber", claimCase.getClaimNumber());
             variables.put("policyId", claimCase.getPolicy().getId().toString());
             variables.put("claimedAmount", claimCase.getClaimedAmount());
             variables.put("coverageAmount", claimCase.getPolicy().getCoverageAmount());
@@ -381,6 +420,7 @@ public class CaseService {
 
             org.flowable.cmmn.api.runtime.CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder()
                     .caseDefinitionKey("insuranceClaimCase")
+                    .businessKey(claimCase.getClaimNumber())
                     .name("理赔案件 - " + claimCase.getClaimNumber())
                     .variables(variables)
                     .start();

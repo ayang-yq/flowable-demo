@@ -62,6 +62,12 @@ public class CaseRuntimeService {
         // 获取变量
         Map<String, Object> variables = cmmnAdapter.getCaseVariables(caseInstanceId);
 
+        // Get businessKey - if null, try to get claimNumber from variables
+        String businessKey = caseInstance.getBusinessKey();
+        if ((businessKey == null || businessKey.isEmpty())) {
+            businessKey = (String) variables.get("claimNumber");
+        }
+
         // 获取 Plan Item Tree
         PlanItemTreeNode planItemTree = cmmnAdapter.getCasePlanItemTree(caseInstanceId);
 
@@ -74,7 +80,7 @@ public class CaseRuntimeService {
                 .caseDefinitionKey(caseInstance.getCaseDefinitionKey())
                 .caseDefinitionName(caseInstance.getCaseDefinitionName())
                 .caseDefinitionVersion(caseInstance.getCaseDefinitionVersion())
-                .businessKey(caseInstance.getBusinessKey())
+                .businessKey(businessKey)
                 .state(caseInstance.getState())
                 .startTime(toLocalDateTime(caseInstance.getStartTime()))
                 .startUserId(caseInstance.getStartUserId())
@@ -133,13 +139,20 @@ public class CaseRuntimeService {
         // 统计 Plan Item 数量
         Map<String, Integer> planItemCounts = cmmnAdapter.countPlanItems(caseInstance.getId());
 
+        // Get businessKey - if null, try to get claimNumber from variables
+        String businessKey = caseInstance.getBusinessKey();
+        if ((businessKey == null || businessKey.isEmpty())) {
+            Map<String, Object> variables = cmmnAdapter.getCaseVariables(caseInstance.getId());
+            businessKey = (String) variables.get("claimNumber");
+        }
+
         return CaseInstanceDTO.builder()
                 .id(caseInstance.getId())
                 .caseDefinitionId(caseInstance.getCaseDefinitionId())
                 .caseDefinitionKey(caseInstance.getCaseDefinitionKey())
                 .caseDefinitionName(caseInstance.getCaseDefinitionName())
                 .caseDefinitionVersion(caseInstance.getCaseDefinitionVersion())
-                .businessKey(caseInstance.getBusinessKey())
+                .businessKey(businessKey)
                 .state(caseInstance.getState())
                 .startTime(toLocalDateTime(caseInstance.getStartTime()))
                 .startUserId(caseInstance.getStartUserId())

@@ -5,9 +5,11 @@ import com.flowable.demo.domain.repository.ClaimCaseRepository;
 import com.flowable.demo.domain.repository.InsurancePolicyRepository;
 import com.flowable.demo.domain.repository.UserRepository;
 import com.flowable.demo.service.CaseService;
+import com.flowable.demo.web.rest.dto.ApproveRequestDTO;
 import com.flowable.demo.web.rest.dto.ClaimCaseDTO;
 import com.flowable.demo.web.rest.dto.InsurancePolicyDTO;
 import com.flowable.demo.web.rest.dto.PaymentRequestDTO;
+import com.flowable.demo.web.rest.dto.RejectRequestDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -309,10 +311,28 @@ public class CaseResource {
     @Transactional
     public ResponseEntity<ClaimCaseDTO> approveClaimCase(
             @Parameter(description = "案件ID") @PathVariable UUID id,
-            @Parameter(description = "批准用户ID") @RequestParam String userId) {
+            @Parameter(description = "批准用户ID") @RequestParam String userId,
+            @Valid @RequestBody ApproveRequestDTO approveRequestDTO) {
         log.debug("REST request to approve ClaimCase : {} by user : {}", id, userId);
 
-        ClaimCase result = caseService.approveClaimCase(id, userId);
+        ClaimCase result = caseService.approveClaimCase(id, userId, approveRequestDTO);
+        ClaimCaseDTO resultDTO = convertToDTO(result);
+
+        return ResponseEntity.ok(resultDTO);
+    }
+
+    /**
+     * 拒绝理赔案件
+     */
+    @PostMapping("/{id}/reject")
+    @Operation(summary = "拒绝理赔案件", description = "拒绝指定的理赔案件")
+    @Transactional
+    public ResponseEntity<ClaimCaseDTO> rejectClaimCase(
+            @Parameter(description = "案件ID") @PathVariable UUID id,
+            @Valid @RequestBody RejectRequestDTO rejectRequestDTO) {
+        log.debug("REST request to reject ClaimCase : {} with reason : {}", id, rejectRequestDTO.getReason());
+
+        ClaimCase result = caseService.rejectClaimCase(id, rejectRequestDTO.getReason());
         ClaimCaseDTO resultDTO = convertToDTO(result);
 
         return ResponseEntity.ok(resultDTO);

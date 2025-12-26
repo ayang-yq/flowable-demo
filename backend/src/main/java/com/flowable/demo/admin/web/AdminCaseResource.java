@@ -1,6 +1,7 @@
 package com.flowable.demo.admin.web;
 
 import com.flowable.demo.admin.service.CaseRuntimeService;
+import com.flowable.demo.admin.service.CaseMigrationService;
 import com.flowable.demo.admin.web.dto.CaseInstanceDTO;
 import com.flowable.demo.admin.web.dto.CaseOperationRequest;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ import java.util.Map;
 public class AdminCaseResource {
 
     private final CaseRuntimeService caseRuntimeService;
+    private final CaseMigrationService caseMigrationService;
 
     /**
      * 查询 Case 实例列表
@@ -162,5 +164,19 @@ public class AdminCaseResource {
         response.put("message", "Plan Item 已触发");
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 迁移现有案例，为没有 businessKey 的案例添加 claimNumber 变量
+     * 
+     * @return 迁移结果
+     */
+    @PostMapping("/migrate-business-key")
+    public ResponseEntity<Map<String, Object>> migrateBusinessKey() {
+        log.info("Starting migration to fix businessKey for existing cases...");
+
+        Map<String, Object> result = caseMigrationService.fixExistingCasesBusinessKey();
+
+        return ResponseEntity.ok(result);
     }
 }
