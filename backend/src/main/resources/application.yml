@@ -80,15 +80,18 @@ flowable:
 # Swagger/OpenAPI 配置
 springdoc:
   api-docs:
-    path: /api-docs
+    enabled: true
+    path: /v3/api-docs
   swagger-ui:
+    enabled: true
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
-  info:
-    title: 保险理赔系统 API
-    description: 基于 Flowable 7.x 的保险理赔管理系统 API 文档
-    version: 1.0.0
+    try-it-out-enabled: true
+    display-request-duration: true
+  show-actuator: false
+  packages-to-scan: com.flowable.demo.web.rest, com.flowable.demo.admin.web
+  paths-to-match: /**
 
 # 管理端点配置
 management:
@@ -127,4 +130,3 @@ spring:
     show-sql: false
     hibernate:
       ddl-auto: validate
-
