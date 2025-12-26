@@ -112,38 +112,226 @@ npm start
 
 ### 理赔案件处理流程 (CMMN Case)
 
-1. **案件创建** - 创建新的理赔案件
-2. **材料收集** - 收集理赔相关文档
-3. **损失评估** - 评估实际损失金额
-4. **规则判定** - DMN 决策表自动判定
-5. **外部调查** - 可选的外部调查阶段
-6. **人工审核** - 基于规则的审核流程
-7. **支付执行** - BPMN 支付流程
-8. **案件关闭** - 最终结案
+```mermaid
+flowchart TD
+    Start((开始)) --> Triage[分诊阶段]
+    
+    subgraph TriageStage [Stage 1: Triage 分诊]
+        Triage --> ReviewClaim[理赔申请审核]
+        ReviewClaim --> AssessComplexity[复杂度评估]
+        AssessComplexity --> ComplexityDecision{复杂度判断}
+    end
+    
+    ComplexityDecision -->|简单 claimComplexity=simple| Approval[审批阶段]
+    ComplexityDecision -->|复杂 claimComplexity=complex| Investigation[调查阶段]
+    
+    subgraph InvestigationStage [Stage 2: Investigation 调查]
+        Investigation --> GatherDocs[收集缺失文档]
+        GatherDocs -->|有缺失| GatherDocs
+        GatherDocs -->|完成| AssessDamage[损失评估]
+        AssessDamage --> FinalApproval[最终审批]
+    end
+    
+    subgraph ApprovalStage [Stage 3: Approval 审批]
+        Approval --> FinalApproval[最终理赔审批]
+        FinalApproval --> ApprovalDecision{审批结果}
+    end
+    
+    ApprovalDecision -->|拒绝 approved=false| NotifyReject[通知客户-拒绝]
+    ApprovalDecision -->|批准 approved=true| Payment[支付阶段]
+    
+    subgraph PaymentStage [Stage 4: Payment 支付]
+        Payment --> PaymentProcess[BPMN支付子流程]
+        PaymentProcess --> ProcessPayment[处理理赔支付]
+    end
+    
+    ProcessPayment --> Closure[结案阶段]
+    
+    subgraph ClosureStage [Stage 5: Closure 结案]
+        Closure --> NotifyCustomer[通知客户结果]
+        NotifyCustomer --> CaseClosed((案件关闭))
+    end
+    
+    style TriageStage fill:#e1f5ff
+    style InvestigationStage fill:#fff4e1
+    style ApprovalStage fill:#ffe1f5
+    style PaymentStage fill:#e1ffe1
+    style ClosureStage fill:#f0f0f0
+    style CaseClosed fill:#4caf50,stroke:#2e7d32,stroke-width:3px
+```
+
+#### 流程阶段说明
+
+| 阶段 | 任务 | 负责人 | 说明 |
+|------|------|--------|------|
+| **Triage 分诊** | 理赔申请审核 | claimAdjuster | 审核申请材料完整性 |
+| | 复杂度评估 | DMN决策表 | 自动评估案件复杂度 |
+| **Investigation 调查** | 收集缺失文档 | claimAdjuster | 循环收集直到完整 |
+| | 损失评估 | damageAssessor | 评估实际损失金额 |
+| **Approval 审批** | 最终理赔审批 | approverGroup | 基于规则的审批 |
+| **Payment 支付** | 处理理赔支付 | paymentOfficer | 执行支付流程 |
+| **Closure 结案** | 通知客户结果 | claimAdjuster | 发送案件结果通知 |
 
 ### 支付流程 (BPMN Process)
 
-1. **支付校验** - 校验支付信息
-2. **执行支付** - 调用支付服务
-3. **支付确认** - 确认支付结果
-4. **更新状态** - 更新 Case 状态
-5. **发送通知** - 发送完成通知
+```mermaid
+flowchart TD
+    Start((支付开始)) --> Validate[支付校验]
+    Validate --> ValidateDecision{校验结果}
+    
+    ValidateDecision -->|批准| Execute[执行支付]
+    ValidateDecision -->|拒绝| Rejected[支付被拒绝]
+    
+    Execute --> Confirm[支付确认]
+    Confirm --> ConfirmDecision{确认结果}
+    
+    ConfirmDecision -->|确认| UpdateCase[更新Case状态]
+    ConfirmDecision -->|争议| Dispute[处理支付争议]
+    
+    UpdateCase --> SendNotify[发送通知]
+    SendNotify --> Success((支付成功))
+    
+    Dispute --> DisputeDecision{争议解决}
+    DisputeDecision -->|重试 retry| Success
+    DisputeDecision -->|取消 cancel| Failed((支付失败))
+    DisputeDecision -->|调查 investigate| Disputed((支付争议))
+    
+    Rejected --> UpdateCase
+    UpdateCase --> Failed
+    
+    style Start fill:#4caf50
+    style Success fill:#4caf50,stroke:#2e7d32,stroke-width:3px
+    style Failed fill:#f44336,stroke:#b71c1c,stroke-width:3px
+    style Disputed fill:#ff9800,stroke:#e65100,stroke-width:3px
+    style Validate fill:#e3f2fd
+    style Execute fill:#e3f2fd
+    style Confirm fill:#e3f2fd
+    style Dispute fill:#fff3e0
+```
 
-### 决策规则 (DMN Table)
+#### 支付流程节点说明
 
-基于以下条件进行智能决策：
-- 保单类型（车险、财产险、人身险）
-- 理赔金额
-- 保额限制
-- 报案类别（事故、盗窃、自然灾害等）
-- 严重性等级
+| 节点 | 类型 | 处理人/服务 | 说明 |
+|------|------|-------------|------|
+| 支付校验 | UserTask | paymentOfficer | 校验支付金额、收款人信息 |
+| 执行支付 | ServiceTask | paymentService | 调用支付服务执行转账 |
+| 支付确认 | UserTask | paymentOfficer | 确认支付交易成功 |
+| 处理争议 | UserTask | paymentManager | 处理支付争议问题 |
+| 更新状态 | ServiceTask | caseService | 更新理赔案件状态 |
+| 发送通知 | ServiceTask | notificationService | 发送支付结果通知 |
 
-输出决策：
-- 赔付方式（快速赔付、标准赔付、分级赔付）
-- 是否需要调查
-- 是否需要人工审核
-- 审批级别（自动、主管、经理、总监）
-- 优先级（普通、重要、紧急）
+### 决策规则 (DMN Decision Table)
+
+```mermaid
+flowchart LR
+    subgraph Inputs [输入条件]
+        A[保单类型<br/>policyType]
+        B[理赔金额<br/>claimedAmount]
+        C[保额<br/>coverageAmount]
+        D[报案类别<br/>claimType]
+        E[严重性<br/>severity]
+    end
+    
+    subgraph DMN [DMN决策引擎]
+        F[理赔决策表<br/>ClaimDecisionTable]
+    end
+    
+    subgraph Outputs [输出结果]
+        G[赔付方式<br/>paymentMethod]
+        H[需要调查<br/>needInvestigation]
+        I[人工审核<br/>needManualReview]
+        J[审批级别<br/>approvalLevel]
+        K[优先级<br/>priority]
+        L[案件复杂度<br/>claimComplexity]
+    end
+    
+    Inputs --> F
+    F --> Outputs
+    
+    style A fill:#e3f2fd
+    style B fill:#e3f2fd
+    style C fill:#e3f2fd
+    style D fill:#e3f2fd
+    style E fill:#e3f2fd
+    style F fill:#ffecb3,stroke:#ffa000,stroke-width:3px
+    style G fill:#c8e6c9
+    style H fill:#c8e6c9
+    style I fill:#c8e6c9
+    style J fill:#c8e6c9
+    style K fill:#c8e6c9
+    style L fill:#c8e6c9
+```
+
+#### 决策规则详情
+
+| 规则 | 保单类型 | 理赔金额 | 严重性 | 赔付方式 | 需要调查 | 审批级别 | 复杂度 |
+|------|---------|---------|--------|---------|---------|---------|--------|
+| 1 | 车险 | ≤10,000 | LOW | 快速赔付 | 否 | 自动 | simple |
+| 2 | 车险 | 10,001-50,000 | MEDIUM | 标准赔付 | 否 | 主管 | simple |
+| 3 | 车险 | >50,000 | - | 分级赔付 | 是 | 经理 | complex |
+| 4 | 财产险 | ≤20,000 | LOW | 标准赔付 | 否 | 主管 | simple |
+| 5 | 财产险 | 20,001-100,000 | MEDIUM | 分级赔付 | 是 | 经理 | complex |
+| 6 | 财产险 | >100,000 | - | 分级赔付 | 是 | 总监 | complex |
+| 7 | 人身险 | ≤30,000 | LOW | 快速赔付 | 否 | 主管 | simple |
+| 8 | 人身险 | 30,001-200,000 | MEDIUM | 分级赔付 | 是 | 经理 | complex |
+| 9 | 人身险 | >200,000 | - | 分级赔付 | 是 | 总监 | complex |
+| 10 | 任意 | - | - | 标准赔付 | 是 | 经理 | complex |
+| 11 | 任意 | - | - | 分级赔付 | 是 | 经理 | complex |
+| 12 | 任意 | - | HIGH/CRITICAL | 分级赔付 | 是 | 总监 | complex |
+| 13 | 任意 | >保额 | - | 按保额赔付 | 是 | 经理 | complex |
+| 14 | 默认 | - | - | 标准赔付 | 否 | 主管 | simple |
+
+### 完整工作流架构图
+
+```mermaid
+graph TB
+    subgraph CMMN [CMMN Case Management<br/>主流程]
+        Case[理赔案件Case]
+        Case --> Triage[Triage阶段]
+        Case --> Invest[Investigation阶段]
+        Case --> Approv[Approval阶段]
+        Case --> Pay[Payment阶段]
+        Case --> Close[Closure阶段]
+    end
+    
+    subgraph DMN [DMN Decision Engine<br/>决策引擎]
+        Decision[理赔决策表<br/>ClaimDecisionTable]
+    end
+    
+    subgraph BPMN [BPMN Process Engine<br/>子流程]
+        Payment[支付流程<br/>ClaimPaymentProcess]
+    end
+    
+    Triage -->|评估复杂度| Decision
+    Decision -->|simple| Approv
+    Decision -->|complex| Invest
+    Invest --> Approv
+    Approv -->|批准| Pay
+    Pay --> Payment
+    Payment --> Close
+    
+    style CMMN fill:#e1f5ff
+    style DMN fill:#fff4e1
+    style BPMN fill:#ffe1f5
+    style Case fill:#1976d2,stroke:#0d47a1,stroke-width:3px,color:#fff
+```
+
+#### 输入参数说明
+
+**输入参数:**
+- **policyType**: 保单类型（车险/财产险/人身险）
+- **claimedAmount**: 理赔金额
+- **coverageAmount**: 保额限制
+- **claimType**: 报案类别（事故/盗窃/自然灾害等）
+- **severity**: 严重性（LOW/MEDIUM/HIGH/CRITICAL）
+
+**输出决策:**
+- **paymentMethod**: 赔付方式（快速赔付/标准赔付/分级赔付/按保额赔付）
+- **needInvestigation**: 是否需要调查（true/false）
+- **needManualReview**: 是否需要人工审核（true/false）
+- **approvalLevel**: 审批级别（自动/主管/经理/总监）
+- **priority**: 优先级（普通/重要/紧急）
+- **claimComplexity**: 案件复杂度（simple/complex）
 
 ## 🔧 技术栈
 
@@ -201,7 +389,17 @@ npm start
 - `GET /api/cases` - 查询 Case 列表
 - `GET /api/cases/{id}` - 获取 Case 详情
 - `PUT /api/cases/{id}` - 更新 Case
-- `POST /api/cases/{id}/start` - 启动 Case 流程
+- `DELETE /api/cases/{id}` - 删除 Case
+- `POST /api/cases/{id}/assign` - 分配案件给用户
+- `POST /api/cases/{id}/status` - 更新案件状态
+- `POST /api/cases/{id}/approve` - 批准理赔案件
+- `POST /api/cases/{id}/pay` - 支付理赔案件
+- `GET /api/cases/by-status` - 根据状态查询案件
+- `GET /api/cases/by-assignee` - 根据分配用户查询案件
+- `GET /api/cases/by-policy/{policyId}` - 根据保单查询案件
+- `GET /api/cases/search` - 搜索案件
+- `GET /api/cases/my-cases` - 获取当前用户的案件
+- `GET /api/cases/statistics` - 获取案件统计信息
 
 ### 任务管理
 - `GET /api/tasks/my` - 我的任务

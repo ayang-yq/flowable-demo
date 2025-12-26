@@ -83,7 +83,11 @@ const ClaimDetail: React.FC = () => {
 
   const handleApprove = async (values: any) => {
     try {
-      await claimApi.approveClaim(id!, values);
+      // Get current user from localStorage
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      
+      await claimApi.approveClaim(id!, user?.id || 'admin', values);
       message.success('审批成功');
       setApproveModalVisible(false);
       loadClaimDetail();
@@ -109,7 +113,20 @@ const ClaimDetail: React.FC = () => {
 
   const handlePay = async (values: any) => {
     try {
-      await claimApi.payClaim(id!, values);
+      // Get current user from localStorage
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      
+      // Build payment request with all required fields
+      const paymentData = {
+        paymentAmount: values.paymentAmount,
+        paymentDate: values.paymentDate || new Date().toISOString().split('T')[0],
+        paymentMethod: values.paymentMethod,
+        paymentReference: values.paymentReference || `PAY-${new Date().toISOString().split('T')[0]}-${id?.substring(0, 8)}`,
+        userId: user?.id || 'admin'
+      };
+      
+      await claimApi.payClaim(id!, paymentData);
       message.success('支付成功');
       setPaymentModalVisible(false);
       loadClaimDetail();
@@ -130,6 +147,27 @@ const ClaimDetail: React.FC = () => {
     } catch (error) {
       console.error('Failed to assign claim:', error);
       message.error('分配失败');
+    }
+  };
+
+  const handleStartReview = async () => {
+    try {
+      // Get current user from localStorage
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      
+      await claimApi.updateClaimStatus(
+        id!, 
+        'UNDER_REVIEW', 
+        '开始审核', 
+        user?.id
+      );
+      message.success('开始审核成功');
+      loadClaimDetail();
+      loadTasks();
+    } catch (error) {
+      console.error('Failed to start review:', error);
+      message.error('开始审核失败');
     }
   };
 
@@ -252,6 +290,14 @@ const ClaimDetail: React.FC = () => {
               编辑
             </Button>
             {claim.status === 'SUBMITTED' && (
+              <Button 
+                type="primary" 
+                onClick={handleStartReview}
+              >
+                开始审核
+              </Button>
+            )}
+            {claim.status === 'UNDER_REVIEW' && (
               <>
                 <Button 
                   type="primary" 
@@ -451,15 +497,24 @@ const ClaimDetail: React.FC = () => {
               parser={value => Number(value!.replace(/¥\s?|(,*)/g, ''))}
             />
           </Form.Item>
-          <Form.Item name="paymentMethod" label="支付方式" rules={[{ required: true }]}>
-            <Select>
-              <Select.Option value="BANK_TRANSFER">银行转账</Select.Option>
+          <Form.Item 
+            name="paymentDate" 
+            label="支付日期" 
+            rules={[{ required: true, message: '请选择支付日期' }]}
+            initialValue={new Date().toISOString().split('T')[0]}
+          >
+            <input type="date" style={{ width: '100%', padding: '8px', border: '1px solid #d9d9d9', borderRadius: '2px' }} />
+          </Form.Item>
+          <Form.Item name="paymentMethod" label="支付方式" rules={[{ required: true, message: '请选择支付方式' }]}>
+            <Select placeholder="请选择支付方式">
+              <Select.Option value="TRANSFER">银行转账</Select.Option>
               <Select.Option value="CASH">现金</Select.Option>
               <Select.Option value="CHECK">支票</Select.Option>
+              <Select.Option value="ONLINE">在线支付</Select.Option>
             </Select>
           </Form.Item>
-          <Form.Item name="comments" label="备注">
-            <TextArea rows={4} />
+          <Form.Item name="paymentReference" label="支付参考号" help="可选，留空将自动生成">
+            <Input placeholder="如：PAY-20241226-001" />
           </Form.Item>
         </Form>
       </Modal>

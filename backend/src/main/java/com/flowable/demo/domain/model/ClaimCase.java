@@ -63,6 +63,9 @@ public class ClaimCase {
     @Column(name = "claimed_amount", nullable = false, precision = 19, scale = 2)
     private BigDecimal claimedAmount;
 
+    @Column(name = "approved_amount", precision = 19, scale = 2)
+    private BigDecimal approvedAmount;
+
     @Column(name = "incident_date", nullable = false)
     private LocalDate incidentDate;
 

@@ -120,8 +120,8 @@ export const claimApi = {
   },
 
   // 审批理赔案件
-  approveClaim: (id: string, variables?: any): Promise<AxiosResponse<void>> => {
-    return api.post(`/cases/${id}/approve`, variables);
+  approveClaim: (id: string, userId: string, variables?: any): Promise<AxiosResponse<void>> => {
+    return api.post(`/cases/${id}/approve`, variables, { params: { userId } });
   },
 
   // 拒绝理赔案件

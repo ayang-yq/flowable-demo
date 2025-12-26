@@ -45,7 +45,10 @@ public class ClaimCaseDTO {
     
     @Schema(description = "索赔金额")
     private Double claimedAmount;
-    
+
+    @Schema(description = "批准金额")
+    private Double approvedAmount;
+
     @Schema(description = "理赔类型")
     private String claimType;
     
@@ -177,7 +180,15 @@ public class ClaimCaseDTO {
     public void setClaimedAmount(Double claimedAmount) {
         this.claimedAmount = claimedAmount;
     }
-    
+
+    public Double getApprovedAmount() {
+        return approvedAmount;
+    }
+
+    public void setApprovedAmount(Double approvedAmount) {
+        this.approvedAmount = approvedAmount;
+    }
+
     public String getClaimType() {
         return claimType;
     }

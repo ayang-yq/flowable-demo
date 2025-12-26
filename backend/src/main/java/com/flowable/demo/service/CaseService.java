@@ -180,6 +180,99 @@ public class CaseService {
     }
 
     /**
+     * 批准理赔案件
+     */
+    public ClaimCase approveClaimCase(UUID caseId, String userId) {
+        log.debug("Approving claim case {} by user {}", caseId, userId);
+
+        ClaimCase claimCase = claimCaseRepository.findById(caseId)
+                .orElseThrow(() -> new IllegalArgumentException("Claim case not found"));
+
+        User approvedBy = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // 设置批准金额（默认为索赔金额）
+        if (claimCase.getApprovedAmount() == null) {
+            claimCase.setApprovedAmount(claimCase.getClaimedAmount());
+        }
+
+        // 更新状态为已批准
+        claimCase.updateStatus("APPROVED", "Claim approved by " + approvedBy.getFullName(), approvedBy);
+        claimCaseRepository.save(claimCase);
+
+        // 如果有 Case 实例，触发完成事件
+        if (claimCase.getCaseInstanceId() != null) {
+            try {
+                // 设置审批结果变量
+                Map<String, Object> variables = new HashMap<>();
+                variables.put("approved", true);
+                variables.put("approvedBy", approvedBy.getUsername());
+                variables.put("approvedDate", LocalDateTime.now().toString());
+                
+                cmmnRuntimeService.setVariables(claimCase.getCaseInstanceId(), variables);
+                
+                log.info("Set approval variables for case instance {}", claimCase.getCaseInstanceId());
+            } catch (Exception e) {
+                log.warn("Failed to set approval variables: {}", e.getMessage());
+            }
+        }
+
+        return claimCase;
+    }
+
+    /**
+     * 支付理赔案件
+     */
+    public ClaimCase payClaimCase(UUID caseId, java.math.BigDecimal paymentAmount, 
+                                  java.time.LocalDate paymentDate, String paymentMethod,
+                                  String paymentReference, String userId) {
+        log.debug("Processing payment for claim case {} by user {}", caseId, userId);
+
+        ClaimCase claimCase = claimCaseRepository.findById(caseId)
+                .orElseThrow(() -> new IllegalArgumentException("Claim case not found"));
+
+        User paidBy = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // 检查是否可以支付（只有已批准状态才能支付）
+        if (claimCase.getStatus() != ClaimCase.ClaimStatus.APPROVED) {
+            throw new IllegalStateException("Claim case must be in APPROVED status to process payment. Current status: " 
+                    + claimCase.getStatus());
+        }
+
+        // 更新状态为支付处理中
+        claimCase.updateStatus("PAYMENT_PROCESSING", "Payment initiated by " + paidBy.getFullName(), paidBy);
+        claimCaseRepository.save(claimCase);
+
+        // 如果有 Case 实例，设置支付相关变量
+        if (claimCase.getCaseInstanceId() != null) {
+            try {
+                Map<String, Object> variables = new HashMap<>();
+                variables.put("paymentAmount", paymentAmount);
+                variables.put("paymentDate", paymentDate.toString());
+                variables.put("paymentMethod", paymentMethod);
+                variables.put("paymentReference", paymentReference);
+                variables.put("paymentStatus", "COMPLETED");
+                variables.put("paidBy", paidBy.getUsername());
+                variables.put("paidDate", LocalDateTime.now().toString());
+                
+                cmmnRuntimeService.setVariables(claimCase.getCaseInstanceId(), variables);
+                
+                log.info("Set payment variables for case instance {}", claimCase.getCaseInstanceId());
+            } catch (Exception e) {
+                log.warn("Failed to set payment variables: {}", e.getMessage());
+            }
+        }
+
+        // 更新状态为已支付
+        String paymentDescription = String.format("Payment processed: Amount=%s, Method=%s, Reference=%s",
+                paymentAmount, paymentMethod, paymentReference);
+        claimCase.updateStatus("PAID", paymentDescription, paidBy);
+        
+        return claimCaseRepository.save(claimCase);
+    }
+
+    /**
      * 获取理赔案件统计信息
      */
     @Transactional(readOnly = true)
@@ -232,9 +325,21 @@ public class CaseService {
             variables.put("incidentDate", claimCase.getIncidentDate().toString());
             variables.put("incidentLocation", claimCase.getIncidentLocation());
             variables.put("incidentDescription", claimCase.getIncidentDescription());
+            
+            // Set claimAdjuster - use creator's username or a default adjuster
             if (claimCase.getCreatedBy() != null) {
                 variables.put("claimAdjuster", claimCase.getCreatedBy().getUsername());
+            } else {
+                // Default claim adjuster if no creator is specified
+                variables.put("claimAdjuster", "admin");
             }
+            
+            // Set other required role variables with default values
+            variables.put("damageAssessor", "admin");
+            variables.put("approverGroup", "managers");
+            
+            // Initialize the DMN output variable to null so it becomes Global
+            variables.put("claimComplexity", null);
 
             // --- Temporary DMN Debugging ---
             log.debug("Attempting to execute DMN for debugging...");
@@ -244,6 +349,11 @@ public class CaseService {
             dmnInputVariables.put("coverageAmount", claimCase.getPolicy().getCoverageAmount());
             dmnInputVariables.put("claimType", claimCase.getClaimType());
             dmnInputVariables.put("severity", claimCase.getSeverity().toString());
+            // Initialize Approval decision (CRITICAL FIX)
+            variables.put("approved", null); 
+
+            // Initialize Payment status (Prevent future error)
+            variables.put("paymentStatus", null);
 
             DmnDecision decision = dmnRepositoryService.createDecisionQuery().decisionKey("ClaimDecisionTable").latestVersion().singleResult();
             if (decision != null) {

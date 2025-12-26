@@ -7,6 +7,7 @@ import com.flowable.demo.domain.repository.UserRepository;
 import com.flowable.demo.service.CaseService;
 import com.flowable.demo.web.rest.dto.ClaimCaseDTO;
 import com.flowable.demo.web.rest.dto.InsurancePolicyDTO;
+import com.flowable.demo.web.rest.dto.PaymentRequestDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -114,16 +115,35 @@ public class CaseResource {
 
     /**
      * 获取指定理赔案件
+     * 支持通过 ClaimCase UUID 或 Flowable Case Instance ID 查询
      */
     @GetMapping("/{id}")
     @Operation(summary = "获取理赔案件", description = "根据ID获取指定的理赔案件详情")
-    public ResponseEntity<ClaimCaseDTO> getClaimCase(@Parameter(description = "案件ID") @PathVariable UUID id) {
+    public ResponseEntity<ClaimCaseDTO> getClaimCase(@Parameter(description = "案件ID") @PathVariable String id) {
         log.debug("REST request to get ClaimCase : {}", id);
 
-        return claimCaseRepository.findById(id)
-                .map(this::convertToDTO)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        // First, try to find by ClaimCase UUID
+        try {
+            UUID uuid = UUID.fromString(id);
+            return claimCaseRepository.findById(uuid)
+                    .map(this::convertToDTO)
+                    .map(ResponseEntity::ok)
+                    .orElseGet(() -> {
+                        // If not found by UUID, try to find by Case Instance ID
+                        log.debug("Not found by UUID, trying Case Instance ID: {}", id);
+                        return claimCaseRepository.findByCaseInstanceId(id)
+                                .map(this::convertToDTO)
+                                .map(ResponseEntity::ok)
+                                .orElse(ResponseEntity.notFound().build());
+                    });
+        } catch (IllegalArgumentException e) {
+            // If id is not a valid UUID, try to find by Case Instance ID directly
+            log.debug("Invalid UUID format, trying Case Instance ID: {}", id);
+            return claimCaseRepository.findByCaseInstanceId(id)
+                    .map(this::convertToDTO)
+                    .map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        }
     }
 
     /**
@@ -282,6 +302,73 @@ public class CaseResource {
     }
 
     /**
+     * 批准理赔案件
+     */
+    @PostMapping("/{id}/approve")
+    @Operation(summary = "批准理赔案件", description = "批准指定的理赔案件")
+    @Transactional
+    public ResponseEntity<ClaimCaseDTO> approveClaimCase(
+            @Parameter(description = "案件ID") @PathVariable UUID id,
+            @Parameter(description = "批准用户ID") @RequestParam String userId) {
+        log.debug("REST request to approve ClaimCase : {} by user : {}", id, userId);
+
+        ClaimCase result = caseService.approveClaimCase(id, userId);
+        ClaimCaseDTO resultDTO = convertToDTO(result);
+
+        return ResponseEntity.ok(resultDTO);
+    }
+
+    /**
+     * 支付理赔案件
+     */
+    @PostMapping("/{id}/pay")
+    @Operation(summary = "支付理赔案件", description = "处理指定理赔案件的支付")
+    @Transactional
+    public ResponseEntity<ClaimCaseDTO> payClaimCase(
+            @Parameter(description = "案件ID") @PathVariable String id,
+            @Valid @RequestBody PaymentRequestDTO paymentRequestDTO) {
+        log.debug("REST request to pay ClaimCase : {} with payment request : {}", id, paymentRequestDTO);
+
+        // 尝试将 ID 解析为 UUID 或 Case Instance ID
+        UUID caseId;
+        try {
+            caseId = UUID.fromString(id);
+        } catch (IllegalArgumentException e) {
+            // 如果不是有效的 UUID，尝试通过 Case Instance ID 查找
+            ClaimCase claimCase = claimCaseRepository.findByCaseInstanceId(id)
+                    .orElseThrow(() -> new IllegalArgumentException("Claim case not found with id: " + id));
+            caseId = claimCase.getId();
+        }
+
+        // 验证案件是否存在
+        if (!claimCaseRepository.existsById(caseId)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        // 默认支付方式
+        String paymentMethod = paymentRequestDTO.getPaymentMethod() != null 
+                ? paymentRequestDTO.getPaymentMethod() 
+                : "TRANSFER";
+
+        // 默认支付参考号
+        String paymentReference = paymentRequestDTO.getPaymentReference() != null 
+                ? paymentRequestDTO.getPaymentReference() 
+                : "PAY-" + java.time.LocalDate.now().toString() + "-" + caseId.toString().substring(0, 8);
+
+        ClaimCase result = caseService.payClaimCase(
+                caseId,
+                paymentRequestDTO.getPaymentAmount(),
+                paymentRequestDTO.getPaymentDate(),
+                paymentMethod,
+                paymentReference,
+                paymentRequestDTO.getUserId()
+        );
+        ClaimCaseDTO resultDTO = convertToDTO(result);
+
+        return ResponseEntity.ok(resultDTO);
+    }
+
+    /**
      * 获取案件统计信息
      */
     @GetMapping("/statistics")
@@ -338,6 +425,10 @@ public class CaseResource {
 
         if (claimCase.getClaimedAmount() != null) {
             dto.setClaimedAmount(claimCase.getClaimedAmount().doubleValue());
+        }
+
+        if (claimCase.getApprovedAmount() != null) {
+            dto.setApprovedAmount(claimCase.getApprovedAmount().doubleValue());
         }
 
         dto.setClaimType(claimCase.getClaimType());
