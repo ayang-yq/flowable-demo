@@ -1,14 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     Table,
     Button,
     Tag,
     Space,
     Card,
-    Spin,
     Alert,
     Input,
-    Modal,
     message,
     Popconfirm,
 } from 'antd';
@@ -33,11 +31,7 @@ const ProcessInstanceList: React.FC = () => {
     const [filterKey, setFilterKey] = useState<string>('');
     const [filterBusinessKey, setFilterBusinessKey] = useState<string>('');
 
-    useEffect(() => {
-        loadProcesses();
-    }, []);
-
-    const loadProcesses = async () => {
+    const loadProcesses = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
@@ -53,7 +47,11 @@ const ProcessInstanceList: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [filterKey, filterBusinessKey]);
+
+    useEffect(() => {
+        loadProcesses();
+    }, [loadProcesses]);
 
     const handleViewDetail = (processInstanceId: string) => {
         navigate(`/admin/processes/${processInstanceId}`);

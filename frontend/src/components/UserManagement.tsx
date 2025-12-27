@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { 
   Card, 
   Table, 
@@ -36,11 +36,7 @@ const UserManagement: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [form] = Form.useForm();
 
-  useEffect(() => {
-    loadUsers();
-  }, [currentPage, pageSize, searchKeyword, statusFilter]);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
       const response = await userApi.getUsers({
@@ -72,7 +68,11 @@ const UserManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, pageSize, searchKeyword, statusFilter]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [currentPage, pageSize, searchKeyword, statusFilter, loadUsers]);
 
   const handleCreate = () => {
     setEditingUser(null);

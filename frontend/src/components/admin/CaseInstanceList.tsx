@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Table, Button, Input, Select, Space, Tag, message, Modal } from 'antd';
 import { SearchOutlined, EyeOutlined, StopOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -24,11 +24,7 @@ const CaseInstanceList: React.FC = () => {
         state: '',
     });
 
-    useEffect(() => {
-        loadData();
-    }, [pagination.current, pagination.pageSize]);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         try {
             setLoading(true);
             const response = await caseApi.queryCaseInstances({
@@ -39,16 +35,20 @@ const CaseInstanceList: React.FC = () => {
 
             const pageData: PageResponse<CaseInstanceDTO> = response.data;
             setData(pageData.content);
-            setPagination({
-                ...pagination,
+            setPagination(prev => ({
+                ...prev,
                 total: pageData.totalElements,
-            });
+            }));
         } catch (error: any) {
             message.error('Failed to load case instances: ' + error.message);
         } finally {
             setLoading(false);
         }
-    };
+    }, [filters, pagination.current, pagination.pageSize]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     const handleSearch = () => {
         setPagination({ ...pagination, current: 1 });

@@ -6,7 +6,6 @@
                    xmlns:dc="http://www.omg.org/spec/CMMN/20151109/DC"
                    xmlns:di="http://www.omg.org/spec/CMMN/20151109/DI"
                    targetNamespace="http://flowable.org/cmmn">
-
     <cmmn:case id="insuranceClaimCase" name="Insurance Claim Case" flowable:initiatorVariableName="initiator">
         <cmmn:casePlanModel id="casePlanModel" name="Insurance Claim Plan Model">
 
@@ -133,6 +132,8 @@
 
         </cmmn:casePlanModel>
     </cmmn:case>
+
+    <cmmn:decision id="ClaimDecisionTable" name="理赔决策表" externalRef="ClaimDecisionTable" />
 
     <cmmndi:CMMNDI>
         <cmmndi:CMMNDiagram id="CMMNDiagram_insuranceClaimCase">

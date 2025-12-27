@@ -7,8 +7,7 @@ import {
   UnorderedListOutlined,
   UserOutlined,
   LogoutOutlined,
-  SettingOutlined,
-  DeploymentUnitOutlined
+  SettingOutlined
 } from '@ant-design/icons';
 import { useState } from 'react';
 

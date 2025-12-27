@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Spin, Alert, Button } from 'antd';
-import { CmmnCaseVisualization, PlanItemState } from '../../types';
+import { PlanItemState } from '../../types';
 import { caseApi } from '../../services/adminApi';
 import './CmmnCaseVisualizer.css';
 
@@ -44,7 +44,103 @@ export const CmmnCaseVisualizer: React.FC<CmmnCaseVisualizerProps> = ({
   const cmmnViewerRef = useRef<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [visualizationData, setVisualizationData] = useState<CmmnCaseVisualization | null>(null);
+
+  /**
+   * 根据状态获取对应的 CSS class
+   */
+  const getStateClass = (state: string): string | null => {
+    switch (state) {
+      case 'active':
+        return 'plan-item-active';
+      case 'available':
+        return 'plan-item-available';
+      case 'completed':
+        return 'plan-item-completed';
+      case 'terminated':
+        return 'plan-item-terminated';
+      case 'suspended':
+        return 'plan-item-suspended';
+      default:
+        return null;
+    }
+  };
+
+  const applyStateHighlights = useCallback((planItems: any[]) => {
+    if (!cmmnViewerRef.current) {
+      console.error('CMMN viewer is not initialized when applying highlights');
+      return;
+    }
+
+    const elementRegistry = cmmnViewerRef.current.get('elementRegistry');
+    console.log('=== Applying state highlights ===');
+    console.log('Plan items received:', planItems.length);
+    
+    // 创建 PlanItem 定义 ID 到状态的映射
+    const planItemStateMap = new Map<string, any>();
+    planItems.forEach(item => {
+      planItemStateMap.set(item.planItemDefinitionId, item);
+    });
+
+    // 遍历所有图形元素
+    const allElements = elementRegistry.getAll();
+    console.log('All elements in diagram:', allElements.length);
+    
+    let matchedCount = 0;
+    allElements.forEach((element: any) => {
+      if (!element.businessObject) return;
+
+      const elementId = element.businessObject.id;
+      const planItemState = planItemStateMap.get(elementId);
+
+      if (planItemState) {
+        matchedCount++;
+        
+        const gfx = elementRegistry.getGraphics(element);
+        
+        if (!gfx) {
+          console.error(`No graphics found for element ${elementId}`);
+          return;
+        }
+
+        const svgElement = gfx;
+        
+        // 移除之前的状态 class
+        svgElement.classList.remove(
+          'plan-item-active',
+          'plan-item-available',
+          'plan-item-completed',
+          'plan-item-terminated',
+          'plan-item-suspended'
+        );
+
+        // 根据状态添加相应的 class
+        const stateClass = getStateClass(planItemState.state);
+        if (stateClass) {
+          svgElement.classList.add(stateClass);
+        }
+
+        // 添加点击事件
+        if (onPlanItemClick) {
+          svgElement.style.cursor = 'pointer';
+          svgElement.onclick = () => {
+            onPlanItemClick({
+              id: planItemState.id,
+              planItemDefinitionId: planItemState.planItemDefinitionId,
+              name: planItemState.name,
+              type: planItemState.type,
+              state: planItemState.state,
+              stageInstanceId: planItemState.stageInstanceId,
+              createTime: planItemState.createTime,
+              completedTime: planItemState.completedTime,
+              terminatedTime: planItemState.terminatedTime,
+            });
+          };
+        }
+      }
+    });
+
+    console.log(`=== Highlight summary: Matched ${matchedCount} of ${planItems.length} plan items to elements ===`);
+  }, [onPlanItemClick]);
 
   const loadVisualizationData = useCallback(async () => {
     if (!caseInstanceId) {
@@ -90,8 +186,6 @@ export const CmmnCaseVisualizer: React.FC<CmmnCaseVisualizerProps> = ({
       const response = await caseApi.getCaseVisualization(caseInstanceId);
       const data = response.data;
       console.log(`API response received, ${data.planItems?.length || 0} plan items`);
-      console.log(`CMMN XML length: ${data.cmmnXml?.length || 0}`);
-      setVisualizationData(data);
 
       if (!data.cmmnXml) {
         throw new Error('CMMN XML is empty');
@@ -99,18 +193,11 @@ export const CmmnCaseVisualizer: React.FC<CmmnCaseVisualizerProps> = ({
 
       console.log('Importing CMMN XML...');
       const importResult = viewer.importXML(data.cmmnXml);
-      console.log('Import result:', importResult);
-      
-      // Wait for import to complete
       await importResult;
       console.log('CMMN XML imported successfully');
       
       // Add a small delay to ensure elements are registered
       await new Promise(resolve => setTimeout(resolve, 100));
-      
-      const elementRegistry = viewer.get('elementRegistry');
-      const allElements = elementRegistry.getAll();
-      console.log(`Elements in registry after import: ${allElements.length}`);
       
       const canvas = viewer.get('canvas');
       if (canvas) {
@@ -124,13 +211,12 @@ export const CmmnCaseVisualizer: React.FC<CmmnCaseVisualizerProps> = ({
       console.log('Visualization loaded successfully');
     } catch (err: any) {
       console.error('Failed to load CMMN visualization:', err);
-      console.error('Error stack:', err.stack);
       setError(err.response?.data?.message || err.message || '加载可视化数据失败');
     } finally {
       console.log('Setting loading to false');
       setLoading(false);
     }
-  }, [caseInstanceId]);
+  }, [caseInstanceId, applyStateHighlights]);
   
   useEffect(() => {
     // Small delay to ensure DOM is ready
@@ -146,149 +232,6 @@ export const CmmnCaseVisualizer: React.FC<CmmnCaseVisualizerProps> = ({
       }
     };
   }, [loadVisualizationData]);
-
-  /**
-   * 应用状态高亮
-   * 
-   * 核心逻辑：
-   * 1. 遍历所有 Plan Item
-   * 2. 根据 planItemDefinitionId 找到对应的 SVG 元素
-   * 3. 根据状态添加相应的 CSS class
-   * 
-   * 注意：不绘制执行路径，只高亮节点状态
-   */
-  const applyStateHighlights = (planItems: any[]) => {
-    if (!cmmnViewerRef.current) {
-      console.error('CMMN viewer is not initialized when applying highlights');
-      return;
-    }
-
-    const elementRegistry = cmmnViewerRef.current.get('elementRegistry');
-    console.log('=== Applying state highlights ===');
-    console.log('Plan items received:', planItems.length);
-    
-    // Log all plan items
-    planItems.forEach(item => {
-      console.log(`Plan item: id=${item.id}, planItemDefinitionId=${item.planItemDefinitionId}, name=${item.name}, state=${item.state}`);
-    });
-
-    // 创建 PlanItem 定义 ID 到状态的映射
-    const planItemStateMap = new Map<string, any>();
-    planItems.forEach(item => {
-      planItemStateMap.set(item.planItemDefinitionId, item);
-    });
-
-    // Log all elements in the diagram
-    const allElements = elementRegistry.getAll();
-    console.log('All elements in diagram:', allElements.length);
-    
-    let sentryCount = 0;
-    let entryCriterionCount = 0;
-    let exitCriterionCount = 0;
-    
-    allElements.forEach((element: any) => {
-      if (element.businessObject) {
-        console.log(`Element: id=${element.businessObject.id}, type=${element.businessObject.$type}`);
-        
-        // Count sentries and criteria
-        const type = element.businessObject.$type;
-        if (type === 'cmmn:Sentry') sentryCount++;
-        if (type === 'cmmn:EntryCriterion') entryCriterionCount++;
-        if (type === 'cmmn:ExitCriterion') exitCriterionCount++;
-      }
-    });
-    
-    console.log(`Found ${sentryCount} Sentries, ${entryCriterionCount} EntryCriteria, ${exitCriterionCount} ExitCriteria`);
-
-    let matchedCount = 0;
-    // 遍历所有图形元素
-    allElements.forEach((element: any) => {
-      if (!element.businessObject) return;
-
-      const elementId = element.businessObject.id;
-      const elementType = element.businessObject.$type;
-      const planItemState = planItemStateMap.get(elementId);
-
-      console.log(`Checking element: ${elementId} (${elementType}), has match: ${!!planItemState}`);
-
-      if (planItemState) {
-        matchedCount++;
-        
-        // Get the graphics using elementRegistry
-        const gfx = elementRegistry.getGraphics(element);
-        console.log(`Graphics for element ${elementId}:`, gfx);
-        
-        if (!gfx) {
-          console.error(`No graphics found for element ${elementId}`);
-          return;
-        }
-
-        // In cmmn-js, getGraphics returns the SVG g element with djs-element class
-        // Apply classes directly to this element
-        const svgElement = gfx;
-        console.log(`SVG element classes for ${elementId}:`, svgElement.className);
-        
-        // 移除之前的状态 class
-        svgElement.classList.remove(
-          'plan-item-active',
-          'plan-item-available',
-          'plan-item-completed',
-          'plan-item-terminated',
-          'plan-item-suspended'
-        );
-
-        // 根据状态添加相应的 class
-        const stateClass = getStateClass(planItemState.state);
-        if (stateClass) {
-          svgElement.classList.add(stateClass);
-          console.log(`✓ Applied class ${stateClass} to element ${elementId} (state: ${planItemState.state})`);
-          console.log(`Element classes after adding:`, svgElement.className);
-        } else {
-          console.warn(`No class found for state: ${planItemState.state}`);
-        }
-
-        // 添加点击事件
-        if (onPlanItemClick) {
-          svgElement.style.cursor = 'pointer';
-          svgElement.onclick = () => {
-            onPlanItemClick({
-              id: planItemState.id,
-              planItemDefinitionId: planItemState.planItemDefinitionId,
-              name: planItemState.name,
-              type: planItemState.type,
-              state: planItemState.state,
-              stageInstanceId: planItemState.stageInstanceId,
-              createTime: planItemState.createTime,
-              completedTime: planItemState.completedTime,
-              terminatedTime: planItemState.terminatedTime,
-            });
-          };
-        }
-      }
-    });
-
-    console.log(`=== Highlight summary: Matched ${matchedCount} of ${planItems.length} plan items to elements ===`);
-  };
-
-  /**
-   * 根据状态获取对应的 CSS class
-   */
-  const getStateClass = (state: string): string | null => {
-    switch (state) {
-      case 'active':
-        return 'plan-item-active';
-      case 'available':
-        return 'plan-item-available';
-      case 'completed':
-        return 'plan-item-completed';
-      case 'terminated':
-        return 'plan-item-terminated';
-      case 'suspended':
-        return 'plan-item-suspended';
-      default:
-        return null;
-    }
-  };
 
   return (
     <div className="cmmn-visualizer-container" style={{ height }}>
@@ -319,7 +262,7 @@ export const CmmnCaseVisualizer: React.FC<CmmnCaseVisualizerProps> = ({
         </div>
       </div>
 
-      {/* CMMN Viewer 容器 - Always rendered */}
+      {/* CMMN Viewer 容器 */}
       <div ref={viewerRef} className="cmmn-viewer"></div>
 
       {/* Loading overlay */}

@@ -192,10 +192,10 @@ public class CaseResource {
             @Parameter(description = "案件ID") @PathVariable UUID id,
             @Parameter(description = "新状态") @RequestParam String status,
             @Parameter(description = "操作描述") @RequestParam(required = false) String description,
-            @Parameter(description = "操作用户ID") @RequestParam UUID userId) {
+            @Parameter(description = "操作用户ID") @RequestParam String userId) {
         log.debug("REST request to update ClaimCase status : {} to {}", id, status);
 
-        ClaimCase result = caseService.updateClaimCaseStatus(id, status, description, userId);
+        ClaimCase result = caseService.updateClaimCaseStatus(id, status, description, UUID.fromString(userId));
         ClaimCaseDTO resultDTO = convertToDTO(result);
 
         return ResponseEntity.ok(resultDTO);
@@ -383,6 +383,38 @@ public class CaseResource {
                 paymentReference,
                 paymentRequestDTO.getUserId()
         );
+        ClaimCaseDTO resultDTO = convertToDTO(result);
+
+        return ResponseEntity.ok(resultDTO);
+    }
+
+    /**
+     * 完成审核任务
+     */
+    @PostMapping("/{id}/complete-review")
+    @Operation(summary = "完成审核任务", description = "完成理赔审核任务并推动流程")
+    @Transactional
+    public ResponseEntity<ClaimCaseDTO> completeReviewTask(
+            @Parameter(description = "案件ID") @PathVariable String id,
+            @Parameter(description = "审核用户ID") @RequestParam String userId,
+            @RequestBody(required = false) java.util.Map<String, String> reviewData) {
+        log.debug("REST request to complete review task for ClaimCase : {} by user : {}", id, userId);
+
+        // 尝试将 ID 解析为 UUID 或 Case Instance ID
+        UUID caseId;
+        try {
+            caseId = UUID.fromString(id);
+        } catch (IllegalArgumentException e) {
+            // 如果不是有效的 UUID，尝试通过 Case Instance ID 查找
+            ClaimCase claimCase = claimCaseRepository.findByCaseInstanceId(id)
+                    .orElseThrow(() -> new IllegalArgumentException("Claim case not found with id: " + id));
+            caseId = claimCase.getId();
+        }
+
+        String reviewComments = reviewData != null ? reviewData.get("reviewComments") : null;
+        String reviewNotes = reviewData != null ? reviewData.get("reviewNotes") : null;
+
+        ClaimCase result = caseService.completeReviewTask(caseId, userId, reviewComments, reviewNotes);
         ClaimCaseDTO resultDTO = convertToDTO(result);
 
         return ResponseEntity.ok(resultDTO);

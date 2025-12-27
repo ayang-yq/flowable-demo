@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Card,
@@ -12,7 +12,6 @@ import {
     message,
     Popconfirm,
     Tree,
-    Divider,
     Tabs,
 } from 'antd';
 import {
@@ -46,13 +45,7 @@ const CaseInstanceDetail: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (caseInstanceId) {
-            loadCaseDetail();
-        }
-    }, [caseInstanceId]);
-
-    const loadCaseDetail = async () => {
+    const loadCaseDetail = useCallback(async () => {
         if (!caseInstanceId) return;
         try {
             setLoading(true);
@@ -64,7 +57,13 @@ const CaseInstanceDetail: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [caseInstanceId]);
+
+    useEffect(() => {
+        if (caseInstanceId) {
+            loadCaseDetail();
+        }
+    }, [caseInstanceId, loadCaseDetail]);
 
     const handleTerminate = async (reason?: string) => {
         if (!caseInstanceId) return;
@@ -96,17 +95,6 @@ const CaseInstanceDetail: React.FC = () => {
             loadCaseDetail();
         } catch (err: any) {
             message.error(`Failed to resume case: ${err.message}`);
-        }
-    };
-
-    const handleTriggerPlanItem = async (planItemInstanceId: string) => {
-        if (!caseInstanceId) return;
-        try {
-            await caseApi.triggerPlanItem(caseInstanceId, planItemInstanceId);
-            message.success('Plan item triggered successfully');
-            loadCaseDetail();
-        } catch (err: any) {
-            message.error(`Failed to trigger plan item: ${err.message}`);
         }
     };
 

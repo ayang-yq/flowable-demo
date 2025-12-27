@@ -16,7 +16,6 @@ import {
   FileTextOutlined, 
   ClockCircleOutlined, 
   CheckCircleOutlined, 
-  ExclamationCircleOutlined,
   TrophyOutlined,
   UserOutlined
 } from '@ant-design/icons';
@@ -86,24 +85,6 @@ const Dashboard: React.FC = () => {
       'CLOSED': '已关闭'
     };
     return texts[status] || status;
-  };
-
-  const getSeverityColor = (severity: string) => {
-    const colors: { [key: string]: string } = {
-      'HIGH': 'red',
-      'MEDIUM': 'orange',
-      'LOW': 'green'
-    };
-    return colors[severity] || 'default';
-  };
-
-  const getSeverityText = (severity: string) => {
-    const texts: { [key: string]: string } = {
-      'HIGH': '高',
-      'MEDIUM': '中',
-      'LOW': '低'
-    };
-    return texts[severity] || severity;
   };
 
   const claimColumns = [

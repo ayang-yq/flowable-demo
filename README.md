@@ -364,6 +364,107 @@ graph TB
 5. **ClaimDocument** - 理赔文档
 6. **ClaimHistory** - 理赔历史
 
+### Claim 与 CMMN Case 集成
+
+系统实现了理赔案件业务流程与 CMMN Case 模型的完全联动：
+
+#### 集成架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     业务层 (Business Layer)                    │
+│  CaseService.approveClaimCase() / rejectClaimCase()           │
+└──────────────────────┬────────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   流程引擎层 (Flowable Engine)                 │
+│  1. 查找当前活跃的CMMN任务                                      │
+│  2. 验证任务类型与操作匹配                                      │
+│  3. 完成CMMN任务 (cmmnTaskService.complete())                  │
+│  4. 设置流程变量                                               │
+└──────────────────────┬────────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   业务实体层 (Domain Entity)                   │
+│  ClaimCase.status 根据CMMN流程进展自动更新                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### 业务操作与 CMMN 任务映射
+
+| 业务操作 | CMMN 任务 | 任务 Key | 说明 |
+|---------|-----------|----------|------|
+| `createClaimCase()` | Case 启动 | - | 创建并启动 CMMN 实例 |
+| `assignClaimCase()` | 审查理赔申请 | taskReviewClaim | 自动完成 |
+| DMN 评估 | 复杂度评估 | taskAssessComplexity | 自动执行 |
+| `updateClaimCase()` | 收集文档/评估损失 | taskGatherDocs / taskAssessDamage | 用户完成 |
+| `approveClaimCase()` | 最终审批 | taskFinalApproval | 设置 `approved=true` 并完成任务 |
+| `rejectClaimCase()` | 最终审批 | taskFinalApproval | 设置 `approved=false` 并完成任务 |
+| `payClaimCase()` | 处理支付 | taskProcessPayment | 完成支付任务 |
+
+#### 状态同步
+
+| CMMN 阶段/任务 | ClaimCase 状态 | 说明 |
+|---------------|-----------------|------|
+| Case Started | SUBMITTED | 案件刚创建 |
+| taskReviewClaim completed | UNDER_REVIEW | 审查完成 |
+| taskAssessComplexity completed | UNDER_REVIEW | 复杂度评估完成 |
+| taskGatherDocuments (复杂案件) | INVESTIGATING | 收集文档中 |
+| taskAssessDamage completed | INVESTIGATING | 损失评估完成 |
+| taskFinalApproval completed (approved=true) | APPROVED | 审批通过 |
+| taskFinalApproval completed (approved=false) | REJECTED | 审批拒绝 |
+| taskProcessPayment completed | PAID | 支付完成 |
+| taskNotifyCustomer completed | CLOSED | 案件关闭 |
+
+#### 关键实现细节
+
+**1. 任务完成辅助方法**
+
+```java
+private void completeCmmnTask(String caseInstanceId, String taskDefinitionKey, 
+                              Map<String, Object> variables) {
+    List<Task> tasks = cmmnTaskService.createTaskQuery()
+        .caseInstanceId(caseInstanceId)
+        .taskDefinitionKey(taskDefinitionKey)
+        .active()
+        .list();
+    
+    if (!tasks.isEmpty()) {
+        cmmnTaskService.complete(tasks.get(0).getId(), variables);
+    }
+}
+```
+
+**2. 批准理赔示例**
+
+```java
+public ClaimCase approveClaimCase(UUID caseId, String userId, ApproveRequestDTO dto) {
+    // 1. 更新业务状态
+    claimCase.updateStatus("APPROVED", description, approvedBy);
+    
+    // 2. 完成CMMN任务以推动流程
+    Map<String, Object> variables = new HashMap<>();
+    variables.put("approved", true);
+    variables.put("approvedBy", approvedBy.getUsername());
+    variables.put("approvedAmount", dto.getApprovedAmount());
+    
+    completeCmmnTask(claimCase.getCaseInstanceId(), "taskFinalApproval", variables);
+    
+    return claimCaseRepository.save(claimCase);
+}
+```
+
+#### 预期效果
+
+- ✅ 业务操作直接驱动 CMMN 流程进展
+- ✅ CMMN 流程状态与 ClaimCase 状态保持同步
+- ✅ 流程可视化能够正确反映当前状态
+- ✅ 每个业务操作都有对应的 CMMN 任务记录
+
+详细技术文档: `docs/claim-cmmn-integration-analysis.md`
+
 ### 角色定义
 
 - **ADMIN** - 系统管理员
@@ -393,7 +494,9 @@ graph TB
 - `POST /api/cases/{id}/assign` - 分配案件给用户
 - `POST /api/cases/{id}/status` - 更新案件状态
 - `POST /api/cases/{id}/approve` - 批准理赔案件
+- `POST /api/cases/{id}/reject` - 拒绝理赔案件
 - `POST /api/cases/{id}/pay` - 支付理赔案件
+- `POST /api/cases/{id}/complete-review` - 完成审核任务（推动CMMN流程）
 - `GET /api/cases/by-status` - 根据状态查询案件
 - `GET /api/cases/by-assignee` - 根据分配用户查询案件
 - `GET /api/cases/by-policy/{policyId}` - 根据保单查询案件

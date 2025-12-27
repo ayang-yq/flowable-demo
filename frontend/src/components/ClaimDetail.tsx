@@ -40,6 +40,7 @@ const ClaimDetail: React.FC = () => {
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
   
   const [form] = Form.useForm();
 
@@ -150,24 +151,25 @@ const ClaimDetail: React.FC = () => {
     }
   };
 
-  const handleStartReview = async () => {
+  const handleCompleteReview = async (values: any) => {
     try {
       // Get current user from localStorage
       const userStr = localStorage.getItem('user');
       const user = userStr ? JSON.parse(userStr) : null;
       
-      await claimApi.updateClaimStatus(
-        id!, 
-        'UNDER_REVIEW', 
-        '开始审核', 
-        user?.id
-      );
-      message.success('开始审核成功');
+      const reviewData = {
+        reviewComments: values.comments,
+        reviewNotes: values.notes
+      };
+      
+      await claimApi.completeReview(id!, user?.id || 'admin', reviewData);
+      message.success('审核完成');
+      setReviewModalVisible(false);
       loadClaimDetail();
       loadTasks();
     } catch (error) {
-      console.error('Failed to start review:', error);
-      message.error('开始审核失败');
+      console.error('Failed to complete review:', error);
+      message.error('审核完成失败');
     }
   };
 
@@ -292,9 +294,9 @@ const ClaimDetail: React.FC = () => {
             {claim.status === 'SUBMITTED' && (
               <Button 
                 type="primary" 
-                onClick={handleStartReview}
+                onClick={() => setReviewModalVisible(true)}
               >
-                开始审核
+                完成审核
               </Button>
             )}
             {claim.status === 'UNDER_REVIEW' && (
@@ -539,6 +541,47 @@ const ClaimDetail: React.FC = () => {
                 </Select.Option>
               ))}
             </Select>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 完成审核模态框 */}
+      <Modal
+        title="审核理赔申请"
+        visible={reviewModalVisible}
+        onCancel={() => {
+          setReviewModalVisible(false);
+          form.resetFields();
+        }}
+        onOk={() => form.submit()}
+        okText="提交审核"
+        cancelText="取消"
+      >
+        <Form 
+          form={form} 
+          onFinish={handleCompleteReview}
+          layout="vertical"
+        >
+          <Form.Item 
+            name="comments" 
+            label="审核意见" 
+            rules={[{ required: true, message: '请填写审核意见' }]}
+            help="请简要说明审核结果，例如：申请材料齐全，符合理赔条件"
+          >
+            <TextArea 
+              rows={4} 
+              placeholder="请填写审核意见" 
+              showCount
+              maxLength={500}
+            />
+          </Form.Item>
+          <Form.Item name="notes" label="备注">
+            <TextArea 
+              rows={3} 
+              placeholder="其他需要记录的信息（可选）"
+              showCount
+              maxLength={300}
+            />
           </Form.Item>
         </Form>
       </Modal>

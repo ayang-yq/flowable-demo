@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
-import { 
-    Card, 
-    Upload, 
-    Button, 
-    Select, 
-    Input, 
-    Form, 
-    Alert, 
-    Spin, 
-    message, 
+import {
+    Card,
+    Upload,
+    Button,
+    Select,
+    Input,
+    Form,
+    Alert,
+    message,
     Space,
     Typography,
     Divider

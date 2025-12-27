@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -205,7 +206,7 @@ public class CaseService {
         claimCase.updateStatus("APPROVED", description, approvedBy);
         claimCaseRepository.save(claimCase);
 
-        // 如果有 Case 实例，触发完成事件
+        // [关键] 完成CMMN任务以推动流程
         if (claimCase.getCaseInstanceId() != null) {
             try {
                 // 设置审批结果变量
@@ -215,11 +216,12 @@ public class CaseService {
                 variables.put("approvedDate", LocalDateTime.now().toString());
                 variables.put("approvedAmount", approveRequestDTO.getApprovedAmount());
                 
-                cmmnRuntimeService.setVariables(claimCase.getCaseInstanceId(), variables);
+                // 查找并完成Final Approval任务
+                completeCmmnTask(claimCase.getCaseInstanceId(), "taskFinalApproval", variables);
                 
-                log.info("Set approval variables for case instance {}", claimCase.getCaseInstanceId());
+                log.info("Approved claim case {} and completed CMMN taskFinalApproval", claimCase.getId());
             } catch (Exception e) {
-                log.warn("Failed to set approval variables: {}", e.getMessage());
+                log.error("Failed to complete CMMN task for approval: {}", e.getMessage(), e);
             }
         }
 
@@ -239,7 +241,7 @@ public class CaseService {
         claimCase.updateStatus("REJECTED", reason, claimCase.getCreatedBy());
         claimCaseRepository.save(claimCase);
 
-        // 如果有 Case 实例，触发完成事件
+        // [关键] 完成CMMN任务以推动流程
         if (claimCase.getCaseInstanceId() != null) {
             try {
                 // 设置审批结果变量
@@ -247,11 +249,12 @@ public class CaseService {
                 variables.put("approved", false);
                 variables.put("rejectReason", reason);
                 
-                cmmnRuntimeService.setVariables(claimCase.getCaseInstanceId(), variables);
+                // 查找并完成Final Approval任务
+                completeCmmnTask(claimCase.getCaseInstanceId(), "taskFinalApproval", variables);
                 
-                log.info("Set rejection variables for case instance {}", claimCase.getCaseInstanceId());
+                log.info("Rejected claim case {} and completed CMMN taskFinalApproval", claimCase.getId());
             } catch (Exception e) {
-                log.warn("Failed to set rejection variables: {}", e.getMessage());
+                log.error("Failed to complete CMMN task for rejection: {}", e.getMessage(), e);
             }
         }
 
@@ -282,7 +285,7 @@ public class CaseService {
         claimCase.updateStatus("PAYMENT_PROCESSING", "Payment initiated by " + paidBy.getFullName(), paidBy);
         claimCaseRepository.save(claimCase);
 
-        // 如果有 Case 实例，设置支付相关变量
+        // [关键] 完成CMMN任务以推动流程
         if (claimCase.getCaseInstanceId() != null) {
             try {
                 Map<String, Object> variables = new HashMap<>();
@@ -294,11 +297,12 @@ public class CaseService {
                 variables.put("paidBy", paidBy.getUsername());
                 variables.put("paidDate", LocalDateTime.now().toString());
                 
-                cmmnRuntimeService.setVariables(claimCase.getCaseInstanceId(), variables);
+                // 查找并完成Process Payment任务
+                completeCmmnTask(claimCase.getCaseInstanceId(), "taskProcessPayment", variables);
                 
-                log.info("Set payment variables for case instance {}", claimCase.getCaseInstanceId());
+                log.info("Processed payment for claim case {} and completed CMMN taskProcessPayment", claimCase.getId());
             } catch (Exception e) {
-                log.warn("Failed to set payment variables: {}", e.getMessage());
+                log.error("Failed to complete CMMN task for payment: {}", e.getMessage(), e);
             }
         }
 
@@ -440,12 +444,118 @@ public class CaseService {
     }
 
     /**
-     * 生成理赔案件编号
+     * 完成审核任务
      */
-    private String generateClaimNumber() {
+    public ClaimCase completeReviewTask(UUID caseId, String userId, String reviewComments, String reviewNotes) {
+        log.debug("Completing review task for claim case {} by user {}", caseId, userId);
+
+        ClaimCase claimCase = claimCaseRepository.findById(caseId)
+                .orElseThrow(() -> new IllegalArgumentException("Claim case not found"));
+
+        // Try to find user by UUID first, then by username as fallback
+        User reviewedBy = null;
+        try {
+            reviewedBy = userRepository.findById(UUID.fromString(userId))
+                    .orElse(null);
+        } catch (IllegalArgumentException e) {
+            // userId is not a valid UUID, try by username
+        }
+        
+        if (reviewedBy == null) {
+            reviewedBy = userRepository.findByUsername(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        }
+
+        // 完成CMMN任务以推动流程 - 不要强制改变状态，让流程自然演进
+        if (claimCase.getCaseInstanceId() != null) {
+            try {
+                Map<String, Object> variables = new HashMap<>();
+                variables.put("reviewedBy", reviewedBy.getUsername());
+                variables.put("reviewedAt", LocalDateTime.now().toString());
+                variables.put("reviewComments", reviewComments);
+                variables.put("reviewNotes", reviewNotes);
+                
+                // CRITICAL: Include DMN decision table input variables
+                // These are needed for the taskAssessComplexity decision task that will be triggered
+                variables.put("policyType", claimCase.getPolicy().getPolicyType());
+                variables.put("claimedAmount", claimCase.getClaimedAmount());
+                variables.put("coverageAmount", claimCase.getPolicy().getCoverageAmount());
+                variables.put("claimType", claimCase.getClaimType());
+                variables.put("severity", claimCase.getSeverity().toString());
+                
+                // 查找并完成Review Claim任务
+                completeCmmnTask(claimCase.getCaseInstanceId(), "taskReviewClaim", variables);
+                
+                log.info("Completed review task for claim case {}", claimCase.getId());
+                
+                // 只在状态为SUBMITTED时才更新为UNDER_REVIEW
+                if (claimCase.getStatus() == ClaimCase.ClaimStatus.SUBMITTED) {
+                    String description = "Review started by " + reviewedBy.getFullName();
+                    if (reviewComments != null && !reviewComments.isBlank()) {
+                        description += " - " + reviewComments;
+                    }
+                    claimCase.updateStatus("UNDER_REVIEW", description, reviewedBy);
+                    claimCaseRepository.save(claimCase);
+                } else {
+                    // 如果已经是其他状态，只添加历史记录
+                    claimCase.addHistory("REVIEW_COMPLETED", 
+                            "Review completed by " + reviewedBy.getFullName() + 
+                            (reviewComments != null && !reviewComments.isBlank() ? 
+                                " - " + reviewComments : ""), 
+                            reviewedBy);
+                    claimCaseRepository.save(claimCase);
+                }
+            } catch (Exception e) {
+                log.error("Failed to complete review CMMN task: {}", e.getMessage(), e);
+                throw new RuntimeException("Failed to complete review task: " + e.getMessage(), e);
+            }
+        }
+
+        return claimCase;
+    }
+
+    /**
+     * 查找并完成指定类型的CMMN任务
+     */
+    private void completeCmmnTask(String caseInstanceId, String taskDefinitionKey, 
+                                    Map<String, Object> variables) {
+        try {
+            List<org.flowable.task.api.Task> tasks = cmmnTaskService.createTaskQuery()
+                    .caseInstanceId(caseInstanceId)
+                    .taskDefinitionKey(taskDefinitionKey)
+                    .active()
+                    .list();
+            
+            if (!tasks.isEmpty()) {
+                org.flowable.task.api.Task task = tasks.get(0);
+                cmmnTaskService.complete(task.getId(), variables);
+                log.info("Completed CMMN task {} for case instance {}", taskDefinitionKey, caseInstanceId);
+            } else {
+                log.warn("No active task {} found for case instance {}", taskDefinitionKey, caseInstanceId);
+            }
+        } catch (Exception e) {
+            log.error("Failed to complete CMMN task {}: {}", taskDefinitionKey, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 生成理赔案件编号
+     * 使用 synchronized 确保线程安全，防止并发请求生成相同的理赔编号
+     */
+    private synchronized String generateClaimNumber() {
         String dateStr = LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
         long sequence = claimCaseRepository.countByCreatedAtAfter(
                 LocalDateTime.now().withHour(0).withMinute(0).withSecond(0)) + 1;
-        return "CLM" + dateStr + String.format("%04d", sequence);
+        String claimNumber = "CLM" + dateStr + String.format("%04d", sequence);
+        
+        // 验证编号是否已存在（双重检查）
+        while (claimCaseRepository.findByClaimNumber(claimNumber).isPresent()) {
+            sequence++;
+            claimNumber = "CLM" + dateStr + String.format("%04d", sequence);
+            log.warn("Generated claim number {} already exists, trying next sequence: {}", 
+                    claimNumber, sequence);
+        }
+        
+        return claimNumber;
     }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { 
   Table, 
   Button, 
@@ -7,11 +7,8 @@ import {
   Select, 
   Card, 
   Tag, 
-  Modal, 
   message,
-  Popconfirm,
-  Row,
-  Col
+  Popconfirm
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -22,8 +19,8 @@ import {
   ExportOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { claimApi, policyApi } from '../services/api';
-import { ClaimCase, InsurancePolicy, PaginationParams } from '../types';
+import { claimApi } from '../services/api';
+import { ClaimCase, PaginationParams } from '../types';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -31,7 +28,6 @@ const { Option } = Select;
 const ClaimList: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [claims, setClaims] = useState<ClaimCase[]>([]);
-  const [policies, setPolicies] = useState<InsurancePolicy[]>([]);
   const [total, setTotal] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -41,12 +37,7 @@ const ClaimList: React.FC = () => {
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    loadClaims();
-    loadPolicies();
-  }, [currentPage, pageSize, searchKeyword, statusFilter, severityFilter]);
-
-  const loadClaims = async () => {
+  const loadClaims = useCallback(async () => {
     try {
       setLoading(true);
       const params: PaginationParams = {
@@ -83,16 +74,11 @@ const ClaimList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, pageSize, searchKeyword, statusFilter, severityFilter]);
 
-  const loadPolicies = async () => {
-    try {
-      const response = await policyApi.getPolicies({ page: 0, size: 1000 });
-      setPolicies(response.data.content);
-    } catch (error) {
-      console.error('Failed to load policies:', error);
-    }
-  };
+  useEffect(() => {
+    loadClaims();
+  }, [currentPage, pageSize, searchKeyword, statusFilter, severityFilter, loadClaims]);
 
   const handleDelete = async (id: string) => {
     try {

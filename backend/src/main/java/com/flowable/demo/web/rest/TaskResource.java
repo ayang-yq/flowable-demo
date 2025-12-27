@@ -1,5 +1,7 @@
 package com.flowable.demo.web.rest;
 
+import com.flowable.demo.domain.model.ClaimCase;
+import com.flowable.demo.domain.repository.ClaimCaseRepository;
 import com.flowable.demo.web.rest.dto.TaskDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -38,6 +40,7 @@ public class TaskResource {
     private final CmmnTaskService cmmnTaskService;
     private final TaskService taskService;
     private final HistoryService historyService;
+    private final ClaimCaseRepository claimCaseRepository;
 
     /**
      * 获取我的待办任务
@@ -167,11 +170,46 @@ public class TaskResource {
             if (variables == null) {
                 variables = new HashMap<>();
             }
+            
+            // Get task info to check if it's a review task
+            Task task = cmmnTaskService.createTaskQuery().taskId(taskId).singleResult();
+            if (task != null && "taskReviewClaim".equals(task.getTaskDefinitionKey())) {
+                // This is the review claim task - add DMN input variables
+                log.debug("Completing review claim task - adding DMN input variables");
+                addDmnInputVariables(task, variables);
+            }
+            
             cmmnTaskService.complete(taskId, variables);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             log.error("Failed to complete task {}: {}", taskId, e.getMessage());
             return ResponseEntity.badRequest().build();
+        }
+    }
+    
+    /**
+     * Add DMN decision table input variables for the decision task
+     * These are required by the taskAssessComplexity decision task
+     */
+    private void addDmnInputVariables(Task task, Map<String, Object> variables) {
+        String caseInstanceId = task.getScopeId();
+        if (caseInstanceId != null) {
+            // Find the claim case by case instance ID
+            claimCaseRepository.findByCaseInstanceId(caseInstanceId).ifPresent(claimCase -> {
+                log.debug("Found claim case {} for task {}", claimCase.getId(), task.getId());
+                
+                // CRITICAL: Include DMN decision table input variables
+                // These are needed for the taskAssessComplexity decision task that will be triggered
+                variables.put("policyType", claimCase.getPolicy().getPolicyType());
+                variables.put("claimedAmount", claimCase.getClaimedAmount());
+                variables.put("coverageAmount", claimCase.getPolicy().getCoverageAmount());
+                variables.put("claimType", claimCase.getClaimType());
+                variables.put("severity", claimCase.getSeverity().toString());
+                
+                log.debug("Added DMN input variables: policyType={}, claimedAmount={}, coverageAmount={}, claimType={}, severity={}",
+                        variables.get("policyType"), variables.get("claimedAmount"), variables.get("coverageAmount"),
+                        variables.get("claimType"), variables.get("severity"));
+            });
         }
     }
 

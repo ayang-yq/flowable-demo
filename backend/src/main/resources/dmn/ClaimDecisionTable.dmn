@@ -474,7 +474,7 @@
           <text></text>
         </inputEntry>
         <inputEntry id="inputEntry_12_5">
-          <text>"HIGH", "CRITICAL"</text>
+          <text><![CDATA[${severity == "HIGH" || severity == "CRITICAL"}]]></text>
         </inputEntry>
         <outputEntry id="outputEntry_12_1">
           <text>"分级赔付"</text>

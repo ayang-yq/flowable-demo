@@ -18,6 +18,7 @@ Before starting any service, you must perform a port check and automatically cle
 2. **Auto-Kill**: If a process is detected on port 8080, execute the following command immediately without asking for permission:
    `taskkill /F /PID {process-id}`
 3. **Action**: Proceed to start the backend service only after ensuring the port is clear.
+4. **Service restart**: Always re-compile and restart the backend if any java file changed.
 
 ## Frontend Service (Port 3000)
 1. **Check**: Before executing the frontend start command, run: 

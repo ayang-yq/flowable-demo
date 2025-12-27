@@ -15,7 +15,7 @@ import {
 } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import { claimApi, policyApi } from '../services/api';
-import { InsurancePolicy, ClaimCase } from '../types';
+import { InsurancePolicy } from '../types';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
@@ -26,7 +26,6 @@ const ClaimForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(false);
   const [policies, setPolicies] = useState<InsurancePolicy[]>([]);
-  const [selectedPolicy, setSelectedPolicy] = useState<InsurancePolicy | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [claimId, setClaimId] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -41,6 +40,7 @@ const ClaimForm: React.FC = () => {
       setClaimId(id);
       loadClaimData(id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const loadPolicies = async () => {
@@ -72,11 +72,6 @@ const ClaimForm: React.FC = () => {
         claimType: claim.claimType,
         severity: claim.severity
       });
-
-      // 设置选中的保单
-      if (claim.policy) {
-        setSelectedPolicy(claim.policy);
-      }
     } catch (error) {
       console.error('Failed to load claim data:', error);
       message.error('加载理赔案件数据失败');
@@ -87,10 +82,8 @@ const ClaimForm: React.FC = () => {
   };
 
   const handlePolicyChange = (policyId: string) => {
-    const policy = policies.find(p => p.id === policyId);
-    setSelectedPolicy(policy || null);
-    
     // 预填充投保人信息 (只填充name，因为InsurancePolicy类型中没有phone和email)
+    const policy = policies.find(p => p.id === policyId);
     if (policy) {
       form.setFieldsValue({
         claimantName: policy.policyholderName

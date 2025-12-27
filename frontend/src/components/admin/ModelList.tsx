@@ -1,24 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     Table,
     Button,
     Tag,
     Space,
     Card,
-    Spin,
     Alert,
     Select,
-    Input,
     Modal,
     Descriptions,
 } from 'antd';
 import {
     ReloadOutlined,
     EyeOutlined,
-    FolderOpenOutlined,
+    DatabaseOutlined,
     DeploymentUnitOutlined,
 } from '@ant-design/icons';
-import { modelApi, ModelDTO, DeploymentDTO } from '../../services/adminApi';
+import { modelApi, ModelDTO } from '../../services/adminApi';
 
 const { Option } = Select;
 
@@ -30,11 +28,7 @@ const ModelList: React.FC = () => {
     const [selectedModel, setSelectedModel] = useState<ModelDTO | null>(null);
     const [detailModalVisible, setDetailModalVisible] = useState(false);
 
-    useEffect(() => {
-        loadModels();
-    }, [selectedType]);
-
-    const loadModels = async () => {
+    const loadModels = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
@@ -45,7 +39,11 @@ const ModelList: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedType]);
+
+    useEffect(() => {
+        loadModels();
+    }, [loadModels]);
 
     const handleViewDetail = async (model: ModelDTO) => {
         try {
@@ -262,7 +260,5 @@ const ModelList: React.FC = () => {
         </div>
     );
 };
-
-const DatabaseOutlined = FolderOpenOutlined;
 
 export default ModelList;

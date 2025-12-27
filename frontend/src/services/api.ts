@@ -133,6 +133,11 @@ export const claimApi = {
   payClaim: (id: string, paymentData: any): Promise<AxiosResponse<void>> => {
     return api.post(`/cases/${id}/pay`, paymentData);
   },
+
+  // 完成审核任务
+  completeReview: (id: string, userId: string, reviewData?: any): Promise<AxiosResponse<void>> => {
+    return api.post(`/cases/${id}/complete-review`, reviewData || {}, { params: { userId } });
+  },
 };
 
 // 任务 API

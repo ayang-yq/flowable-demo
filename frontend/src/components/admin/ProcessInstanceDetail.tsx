@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Card,
@@ -24,7 +24,7 @@ import {
     CheckCircleOutlined,
     CloseCircleOutlined,
 } from '@ant-design/icons';
-import { processApi, ProcessInstanceDTO, ProcessDiagramDTO, ActivityInfo } from '../../services/adminApi';
+import { processApi, ProcessInstanceDTO, ProcessDiagramDTO } from '../../services/adminApi';
 
 const ProcessInstanceDetail: React.FC = () => {
     const { processInstanceId } = useParams<{ processInstanceId: string }>();
@@ -35,14 +35,7 @@ const ProcessInstanceDetail: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [diagramModalVisible, setDiagramModalVisible] = useState(false);
 
-    useEffect(() => {
-        if (processInstanceId) {
-            loadProcessDetail();
-            loadProcessDiagram();
-        }
-    }, [processInstanceId]);
-
-    const loadProcessDetail = async () => {
+    const loadProcessDetail = useCallback(async () => {
         if (!processInstanceId) return;
         try {
             setLoading(true);
@@ -54,9 +47,9 @@ const ProcessInstanceDetail: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [processInstanceId]);
 
-    const loadProcessDiagram = async () => {
+    const loadProcessDiagram = useCallback(async () => {
         if (!processInstanceId) return;
         try {
             const response = await processApi.getProcessDiagram(processInstanceId);
@@ -64,7 +57,14 @@ const ProcessInstanceDetail: React.FC = () => {
         } catch (err: any) {
             console.error('Failed to load process diagram:', err);
         }
-    };
+    }, [processInstanceId]);
+
+    useEffect(() => {
+        if (processInstanceId) {
+            loadProcessDetail();
+            loadProcessDiagram();
+        }
+    }, [processInstanceId, loadProcessDetail, loadProcessDiagram]);
 
     const handleTerminate = async (reason?: string) => {
         if (!processInstanceId) return;

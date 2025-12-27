@@ -1,20 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Card, 
-  Tabs, 
-  Table, 
-  Button, 
-  Space, 
-  Tag, 
-  Modal, 
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  Card,
+  Tabs,
+  Table,
+  Button,
+  Space,
+  Tag,
+  Modal,
   message,
-  Popconfirm,
-  Input,
-  Select
+  Popconfirm
 } from 'antd';
 import { 
   CheckOutlined, 
-  ExclamationCircleOutlined,
   UserOutlined,
   ClockCircleOutlined
 } from '@ant-design/icons';
@@ -23,8 +20,6 @@ import { taskApi, userApi } from '../services/api';
 import { FlowableTask, User } from '../types';
 
 const { TabPane } = Tabs;
-const { Search } = Input;
-const { Option } = Select;
 
 const TaskList: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -41,13 +36,7 @@ const TaskList: React.FC = () => {
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    loadMyTasks();
-    loadClaimableTasks();
-    loadUsers();
-  }, [currentPage, pageSize, activeTab]);
-
-  const loadMyTasks = async () => {
+  const loadMyTasks = useCallback(async () => {
     try {
       setLoading(true);
       const response = await taskApi.getMyTasks('admin', {
@@ -62,9 +51,9 @@ const TaskList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, pageSize]);
 
-  const loadClaimableTasks = async () => {
+  const loadClaimableTasks = useCallback(async () => {
     try {
       setLoading(true);
       const response = await taskApi.getClaimableTasks('admin', {
@@ -79,7 +68,7 @@ const TaskList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, pageSize]);
 
   const loadUsers = async () => {
     try {
@@ -89,6 +78,12 @@ const TaskList: React.FC = () => {
       console.error('Failed to load users:', error);
     }
   };
+
+  useEffect(() => {
+    loadMyTasks();
+    loadClaimableTasks();
+    loadUsers();
+  }, [currentPage, pageSize, activeTab, loadMyTasks, loadClaimableTasks]);
 
   const handleClaimTask = async (taskId: string) => {
     try {
