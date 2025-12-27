@@ -5,6 +5,7 @@ import com.flowable.demo.admin.service.CaseMigrationService;
 import com.flowable.demo.admin.web.dto.CaseInstanceDTO;
 import com.flowable.demo.admin.web.dto.CaseOperationRequest;
 import com.flowable.demo.admin.web.dto.CmmnCaseVisualizationDTO;
+import com.flowable.demo.admin.web.dto.BpmnSubprocessVisualizationDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -196,5 +197,50 @@ public class AdminCaseResource {
         CmmnCaseVisualizationDTO visualization = caseRuntimeService.getCaseVisualizationData(caseInstanceId);
 
         return ResponseEntity.ok(visualization);
+    }
+
+    /**
+     * 获取 BPMN 子流程可视化数据
+     * 用于在 CMMN 可视化中展开显示 processTask 对应的 BPMN 流程
+     * 
+     * @param planItemInstanceId PlanItem 实例 ID（processTask 实例）
+     * @return BPMN 子流程可视化 DTO
+     */
+    @GetMapping("/plan-items/{planItemInstanceId}/subprocess-visualization")
+    public ResponseEntity<BpmnSubprocessVisualizationDTO> getSubprocessVisualization(
+            @PathVariable String planItemInstanceId) {
+        log.info("Get subprocess visualization for plan item: {}", planItemInstanceId);
+
+        BpmnSubprocessVisualizationDTO visualization = 
+                caseRuntimeService.getSubprocessVisualizationData(planItemInstanceId);
+
+        if (visualization == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(visualization);
+    }
+
+    /**
+     * 获取 BPMN 子流程流程图（使用 Flowable ProcessDiagramGenerator 生成）
+     * 返回带状态高亮的流程图图片（SVG格式）
+     * 
+     * @param planItemInstanceId PlanItem 实例 ID（processTask 实例）
+     * @return 流程图 SVG
+     */
+    @GetMapping("/plan-items/{planItemInstanceId}/subprocess-diagram")
+    public ResponseEntity<String> getSubprocessDiagram(
+            @PathVariable String planItemInstanceId) {
+        log.info("Get subprocess diagram for plan item: {}", planItemInstanceId);
+
+        String diagramSvg = caseRuntimeService.getSubprocessDiagramSvg(planItemInstanceId);
+
+        if (diagramSvg == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType("image/svg+xml"))
+                .body(diagramSvg);
     }
 }

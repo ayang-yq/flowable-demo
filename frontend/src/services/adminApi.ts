@@ -167,6 +167,28 @@ export interface PlanItemStateDTO {
     terminatedTime?: string;
 }
 
+export interface BpmnSubprocessVisualizationDTO {
+    processInstanceId: string;
+    processDefinitionId: string;
+    processDefinitionKey: string;
+    processDefinitionName: string;
+    bpmnXml: string;
+    activityStates: ActivityStateDTO[];
+    processInstanceState: string;
+    startTime?: string;
+    endTime?: string;
+}
+
+export interface ActivityStateDTO {
+    activityId: string;
+    activityName: string;
+    activityType: string;
+    state: 'active' | 'completed' | 'available';
+    processInstanceId: string;
+    startTime?: string;
+    endTime?: string;
+}
+
 export interface PageResponse<T> {
     content: T[];
     totalElements: number;
@@ -263,6 +285,22 @@ export const caseApi = {
      */
     getCaseVisualization: (caseInstanceId: string) =>
         adminApi.get<CmmnCaseVisualizationDTO>(`/cases/${caseInstanceId}/visualization`),
+
+    /**
+     * 获取 BPMN 子流程可视化数据
+     * 用于在 CMMN 可视化中展开显示 processTask 对应的 BPMN 流程
+     */
+    getSubprocessVisualization: (planItemInstanceId: string) =>
+        adminApi.get<BpmnSubprocessVisualizationDTO>(`/cases/plan-items/${planItemInstanceId}/subprocess-visualization`),
+
+    /**
+     * 获取 BPMN 子流程流程图（使用 Flowable ProcessDiagramGenerator 生成）
+     * 返回带状态高亮的流程图 SVG
+     */
+    getSubprocessDiagram: (planItemInstanceId: string) =>
+        adminApi.get<string>(`/cases/plan-items/${planItemInstanceId}/subprocess-diagram`, {
+            responseType: 'text'
+        }),
 };
 
 // Process Management API

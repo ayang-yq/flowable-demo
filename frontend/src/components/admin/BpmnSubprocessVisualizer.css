@@ -1,0 +1,116 @@
+/* BPMN Subprocess Visualizer Styles */
+
+/* BPMN Activity State Highlighting */
+.bpmn-activity-active rect,
+.bpmn-activity-active polygon,
+.bpmn-activity-active circle,
+.bpmn-activity-active path {
+  stroke: #52c41a !important;
+  stroke-width: 3px !important;
+}
+
+.bpmn-activity-active text {
+  fill: #389e0d !important;
+  font-weight: bold !important;
+}
+
+.bpmn-activity-active .djs-shape {
+  filter: drop-shadow(0 0 4px rgba(82, 196, 26, 0.5));
+}
+
+.bpmn-activity-completed rect,
+.bpmn-activity-completed polygon,
+.bpmn-activity-completed circle,
+.bpmn-activity-completed path {
+  stroke: #1890ff !important;
+  stroke-width: 3px !important;
+}
+
+.bpmn-activity-completed text {
+  fill: #096dd9 !important;
+  font-weight: bold !important;
+}
+
+.bpmn-activity-completed .djs-shape {
+  filter: drop-shadow(0 0 4px rgba(24, 144, 255, 0.5));
+}
+
+.bpmn-activity-available rect,
+.bpmn-activity-available polygon,
+.bpmn-activity-available circle,
+.bpmn-activity-available path {
+  stroke: #bfbfbf !important;
+  stroke-width: 2px !important;
+}
+
+.bpmn-activity-available text {
+  fill: #999999 !important;
+}
+
+.bpmn-activity-available .djs-shape {
+  opacity: 0.6;
+}
+
+/* BPMN Container */
+.bpmn-container {
+  width: 100%;
+  height: 100%;
+}
+
+/* Overlay Styles */
+.bpmn-overlay {
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* BPMN Canvas Styling */
+.bjs-container {
+  border: none;
+  background-color: #ffffff;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.bjs-container > .djs-container {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  flex: 1 !important;
+}
+
+.djs-palette,
+.djs-properties-panel {
+  display: none !important;
+}
+
+/* SVG Canvas */
+.djs-container svg {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+}
+
+.djs-container .djs-element-container {
+  height: 100% !important;
+}
+
+/* Canvas background */
+.djs-container .viewport {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* BPMN Element Hover Effects */
+.djs-element:hover .djs-outline {
+  stroke-width: 3px;
+  stroke: #1890ff;
+}
+
+/* BPMN Element Selection */
+.djs-element.selected .djs-outline {
+  stroke: #1890ff;
+  stroke-width: 3px;
+}

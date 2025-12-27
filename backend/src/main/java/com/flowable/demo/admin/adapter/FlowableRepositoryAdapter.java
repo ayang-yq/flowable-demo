@@ -239,6 +239,23 @@ public class FlowableRepositoryAdapter {
         }
     }
 
+    /**
+     * 获取 BPMN 定义资源内容（通过部署 ID 和资源名称）
+     */
+    public String getProcessDefinitionResourceContent(String deploymentId, String resourceName) {
+        try {
+            byte[] resourceBytes = repositoryService.getResourceAsStream(
+                    deploymentId,
+                    resourceName).readAllBytes();
+
+            return new String(resourceBytes, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            log.error("Failed to read BPMN resource content for deployment: {}, resource: {}",
+                    deploymentId, resourceName, e);
+            return null;
+        }
+    }
+
     // ==================== DMN 相关 ====================
 
     /**

@@ -29,6 +29,7 @@ import {
 } from '@ant-design/icons';
 import { caseApi, CaseInstanceDTO, PlanItemTreeNode } from '../../services/adminApi';
 import { CmmnCaseVisualizer } from './CmmnCaseVisualizer';
+import { BpmnSubprocessVisualizer } from './BpmnSubprocessVisualizer';
 import { PlanItemState } from '../../types';
 
 interface DataNode {
@@ -44,6 +45,7 @@ const CaseInstanceDetail: React.FC = () => {
     const [caseInstance, setCaseInstance] = useState<CaseInstanceDTO | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [selectedPlanItemId, setSelectedPlanItemId] = useState<string | null>(null);
 
     const loadCaseDetail = useCallback(async () => {
         if (!caseInstanceId) return;
@@ -206,6 +208,14 @@ const CaseInstanceDetail: React.FC = () => {
     const treeData = caseInstance.planItemTree ? [buildTreeData(caseInstance.planItemTree)] : [];
 
     const handlePlanItemClick = (planItem: PlanItemState) => {
+        // For process tasks, show subprocess visualization modal
+        if (planItem.type === 'processtask') {
+            console.log('Process task clicked, opening subprocess visualizer:', planItem.id);
+            setSelectedPlanItemId(planItem.id);
+            return;
+        }
+
+        // For other task types, show plan item details modal
         Modal.info({
             title: `Plan Item: ${planItem.name}`,
             width: 600,
@@ -412,6 +422,14 @@ const CaseInstanceDetail: React.FC = () => {
                         ))}
                     </div>
                 </Card>
+            )}
+
+            {/* BPMN Subprocess Visualizer Modal */}
+            {selectedPlanItemId && (
+                <BpmnSubprocessVisualizer
+                    planItemInstanceId={selectedPlanItemId}
+                    onClose={() => setSelectedPlanItemId(null)}
+                />
             )}
         </div>
     );

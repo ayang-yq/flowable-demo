@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Spin, Alert, Button } from 'antd';
 import { PlanItemState } from '../../types';
 import { caseApi } from '../../services/adminApi';
+import { BpmnSubprocessVisualizer } from './BpmnSubprocessVisualizer';
 import './CmmnCaseVisualizer.css';
 
 // Import cmmn-js CSS styles
@@ -44,6 +45,7 @@ export const CmmnCaseVisualizer: React.FC<CmmnCaseVisualizerProps> = ({
   const cmmnViewerRef = useRef<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [subprocessPlanItemId, setSubprocessPlanItemId] = useState<string | null>(null);
 
   /**
    * 根据状态获取对应的 CSS class
@@ -72,6 +74,7 @@ export const CmmnCaseVisualizer: React.FC<CmmnCaseVisualizerProps> = ({
     }
 
     const elementRegistry = cmmnViewerRef.current.get('elementRegistry');
+    const eventBus = cmmnViewerRef.current.get('eventBus');
     console.log('=== Applying state highlights ===');
     console.log('Plan items received:', planItems.length);
     
@@ -80,6 +83,11 @@ export const CmmnCaseVisualizer: React.FC<CmmnCaseVisualizerProps> = ({
     planItems.forEach(item => {
       planItemStateMap.set(item.planItemDefinitionId, item);
     });
+
+    // Remove previous click listeners if any
+    if (eventBus) {
+      eventBus.off('element.click');
+    }
 
     // 遍历所有图形元素
     const allElements = elementRegistry.getAll();
@@ -119,10 +127,33 @@ export const CmmnCaseVisualizer: React.FC<CmmnCaseVisualizerProps> = ({
           svgElement.classList.add(stateClass);
         }
 
-        // 添加点击事件
-        if (onPlanItemClick) {
-          svgElement.style.cursor = 'pointer';
-          svgElement.onclick = () => {
+        // 设置光标样式
+        svgElement.style.cursor = 'pointer';
+      }
+    });
+
+    // 使用 cmmn-js 事件总线处理点击事件
+    if (eventBus) {
+      eventBus.on('element.click', (event: any) => {
+        const element = event.element;
+        if (!element.businessObject) return;
+
+        const elementId = element.businessObject.id;
+        const planItemState = planItemStateMap.get(elementId);
+
+        if (planItemState) {
+          event.stopPropagation();
+          
+          console.log('PlanItem clicked (via eventBus):', planItemState.type, planItemState.id, planItemState.state);
+          
+          // 如果是 processtask 类型，打开子流程可视化器
+          if (planItemState.type === 'processtask') {
+            console.log('Opening subprocess visualization for plan item:', planItemState.id);
+            setSubprocessPlanItemId(planItemState.id);
+          }
+          
+          // 同时触发父组件的回调
+          if (onPlanItemClick) {
             onPlanItemClick({
               id: planItemState.id,
               planItemDefinitionId: planItemState.planItemDefinitionId,
@@ -134,10 +165,10 @@ export const CmmnCaseVisualizer: React.FC<CmmnCaseVisualizerProps> = ({
               completedTime: planItemState.completedTime,
               terminatedTime: planItemState.terminatedTime,
             });
-          };
+          }
         }
-      }
-    });
+      });
+    }
 
     console.log(`=== Highlight summary: Matched ${matchedCount} of ${planItems.length} plan items to elements ===`);
   }, [onPlanItemClick]);
@@ -217,6 +248,11 @@ export const CmmnCaseVisualizer: React.FC<CmmnCaseVisualizerProps> = ({
       setLoading(false);
     }
   }, [caseInstanceId, applyStateHighlights]);
+
+  // 关闭子流程可视化器
+  const closeSubprocessVisualization = () => {
+    setSubprocessPlanItemId(null);
+  };
   
   useEffect(() => {
     // Small delay to ensure DOM is ready
@@ -302,6 +338,17 @@ export const CmmnCaseVisualizer: React.FC<CmmnCaseVisualizerProps> = ({
           刷新
         </Button>
       </div>
+
+      {/* BPMN 子流程可视化器 */}
+      {subprocessPlanItemId && (
+        <>
+          {console.log('Rendering BpmnSubprocessVisualizer with planItemInstanceId:', subprocessPlanItemId)}
+          <BpmnSubprocessVisualizer
+            planItemInstanceId={subprocessPlanItemId}
+            onClose={closeSubprocessVisualization}
+          />
+        </>
+      )}
     </div>
   );
 };

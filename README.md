@@ -559,6 +559,210 @@ public ClaimCase approveClaimCase(UUID caseId, String userId, ApproveRequestDTO 
 
 基于 **Flowable UI 6.8 设计思路**，实现了轻量级的 CMMN Case 运行状态可视化功能。
 
+### **BPMN 子流程可视化功能** (NEW)
+
+支持在 CMMN Case 可视化中点击 processTask 节点，展开显示对应的 BPMN 子流程。提供两种渲染模式：
+
+#### 双渲染模式支持
+
+1. **bpmn-js 渲染模式**
+   - 使用 bpmn-js 库渲染 BPMN 模型
+   - 支持缩放、拖拽交互
+   - 自定义 CSS 样式高亮活动节点状态
+
+2. **Flowable ProcessDiagramGenerator 渲染模式**
+   - 使用 Flowable 官方 ProcessDiagramGenerator API
+   - 生成带状态高亮的 SVG 流程图
+   - 官方渲染引擎，样式更标准
+
+#### 切换方式
+
+在子流程可视化弹窗右上角，通过"渲染模式"开关切换：
+- 关闭状态：bpmn-js 渲染
+- 开启状态：Flowable 渲染
+
+#### API 端点
+
+```bash
+# 获取 BPMN 子流程可视化数据（bpmn-js 模式）
+GET /api/admin/cases/plan-items/{planItemInstanceId}/subprocess-visualization
+
+# 获取 BPMN 子流程流程图 SVG（Flowable 渲染模式）
+GET /api/admin/cases/plan-items/{planItemInstanceId}/subprocess-diagram
+```
+
+#### 返回数据示例
+
+**bpmn-js 模式数据结构：**
+```typescript
+{
+  processInstanceId: string;
+  processDefinitionId: string;
+  processDefinitionKey: string;
+  processDefinitionName: string;
+  bpmnXml: string;           // BPMN XML
+  activityStates: [          // 活动节点状态列表
+    {
+      activityId: string;
+      activityName: string;
+      activityType: string;
+      state: 'active' | 'completed' | 'available';
+      startTime?: string;
+      endTime?: string;
+    }
+  ];
+  processInstanceState: 'active' | 'completed';
+  startTime?: string;
+  endTime?: string;
+}
+```
+
+**Flowable 模式数据结构：**
+```typescript
+// 直接返回 SVG 字符串
+<string>
+```
+
+#### 状态高亮规则
+
+| 状态 | 颜色 | 说明 |
+|------|------|------|
+| Active (活动) | 绿色 (#52c41a) | 当前正在执行的活动节点 |
+| Completed (已完成) | 蓝色 (#1890ff) | 已完成的活动节点 |
+| Available (可用) | 灰色 (#d9d9d9) | 尚未执行的活动节点 |
+
+#### 技术实现
+
+**后端 - Flowable ProcessDiagramGenerator：**
+
+```java
+public String getSubprocessDiagramSvg(String planItemInstanceId) {
+    // 1. 获取 PlanItem 实例
+    // 2. 查找关联的 Process 实例
+    // 3. 使用 ProcessDiagramGenerator 生成 SVG
+    
+    ProcessDiagramGenerator diagramGenerator = 
+        processEngine.getProcessEngineConfiguration().getProcessDiagramGenerator();
+    
+    InputStream diagramStream = diagramGenerator.generateDiagram(
+        bpmnModel,
+        "svg",
+        activeActivityIds,
+        completedActivityIds,
+        activityFontName,
+        labelFontName,
+        annotationFontName,
+        classLoader,
+        1.0,
+        true
+    );
+    
+    // 将 InputStream 转换为 String 返回
+    byte[] bytes = diagramStream.readAllBytes();
+    return new String(bytes, StandardCharsets.UTF_8);
+}
+```
+
+**前端 - 双模式切换：**
+
+```tsx
+const [renderMode, setRenderMode] = useState<'bpmnjs' | 'flowable'>('bpmnjs');
+const [flowableDiagramSvg, setFlowableDiagramSvg] = useState<string | null>(null);
+
+// 切换渲染模式
+const handleRenderModeChange = (checked: boolean) => {
+  const newMode = checked ? 'flowable' : 'bpmnjs';
+  setRenderMode(newMode);
+};
+
+// 根据模式加载对应数据
+useEffect(() => {
+  if (visualization && renderMode === 'flowable') {
+    loadFlowableDiagram();  // 加载 Flowable SVG
+  } else if (visualization && renderMode === 'bpmnjs') {
+    renderBpmnDiagram(visualization.bpmnXml, visualization.activityStates);
+  }
+}, [renderMode]);
+```
+
+#### 使用示例
+
+在 CMMN Case 可视化中点击 processTask 节点：
+
+```tsx
+<CmmnCaseVisualizer
+  caseInstanceId={caseInstanceId}
+  onPlanItemClick={(planItem) => {
+    if (planItem.type === 'processtask') {
+      // 显示子流程可视化（默认 bpmn-js 模式）
+      setShowSubprocessVisualizer(true);
+    }
+  }}
+/>
+
+{/* 子流程可视化弹窗 */}
+{showSubprocessVisualizer && (
+  <BpmnSubprocessVisualizer
+    planItemInstanceId={selectedPlanItemInstanceId}
+    onClose={() => setShowSubprocessVisualizer(false)}
+  />
+)}
+```
+
+#### 两种渲染模式对比
+
+| 特性 | bpmn-js 模式 | Flowable ProcessDiagramGenerator 模式 |
+|------|-------------|-------------------------------------|
+| 渲染引擎 | bpmn-js | Flowable ProcessDiagramGenerator |
+| 交互性 | 支持缩放、拖拽 | 静态 SVG |
+| 自定义样式 | 完全自定义 CSS | Flowable 官方样式 |
+| 样式一致性 | 需手动调整 | Flowable 官方标准 |
+| 数据格式 | BPMN XML + 状态数据 | 直接返回 SVG |
+| 适用场景 | 需要交互操作 | 需要标准化输出 |
+
+#### 中文字体支持
+
+**问题**：BPMN流程图中中文字符显示为方框
+
+**解决方案**：在Flowable ProcessDiagramGenerator中使用Microsoft YaHei中文字体
+
+**实现方式**：
+
+```java
+// 使用 Microsoft YaHei 字体生成流程图
+DefaultProcessDiagramGenerator generator = new DefaultProcessDiagramGenerator();
+
+InputStream diagramStream = generator.generateDiagram(
+    bpmnModel,
+    "png",
+    activeActivityIds,
+    completedActivityIds,
+    "Microsoft YaHei",  // activity font
+    "Microsoft YaHei",  // label font
+    "Microsoft YaHei",  // annotation font
+    Thread.currentThread().getContextClassLoader(),
+    1.0,
+    true
+);
+```
+
+**应用范围**：
+- ✅ BPMN子流程可视化（Flowable渲染模式）
+- ✅ 所有流程图生成功能（active, completed节点）
+- ✅ 历史流程图生成
+
+**要求**：
+- Windows系统需安装Microsoft YaHei字体（系统自带）
+- 其他系统需要安装对应的中文字体，并修改字体名称
+
+#### 优势
+
+1. **灵活性**：用户可根据需求选择最适合的渲染方式
+2. **兼容性**：两种模式都支持完整的节点状态高亮
+3. **可靠性**：Flowable 官方渲染器保证输出质量
+4. **易用性**：一键切换，无需配置
+5. **中文支持**：正确显示中文字符，无需额外配置
+
 #### 设计原则
 
 1. **前后端分离架构**
