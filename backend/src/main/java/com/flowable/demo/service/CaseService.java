@@ -12,9 +12,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.flowable.cmmn.api.CmmnRuntimeService;
 import org.flowable.cmmn.api.CmmnTaskService;
-import org.flowable.dmn.api.DmnRepositoryService;
-import org.flowable.dmn.api.DmnDecision;
-import org.flowable.dmn.api.DmnDecisionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,8 +37,6 @@ public class CaseService {
     private final UserRepository userRepository;
     private final CmmnRuntimeService cmmnRuntimeService;
     private final CmmnTaskService cmmnTaskService;
-    private final DmnRepositoryService dmnRepositoryService;
-    private final DmnDecisionService dmnDecisionService;
 
     /**
      * 创建理赔案件
@@ -216,6 +211,20 @@ public class CaseService {
                 variables.put("approvedDate", LocalDateTime.now().toString());
                 variables.put("approvedAmount", approveRequestDTO.getApprovedAmount());
                 
+                // [FIX] Set all required parameters for the ClaimPaymentProcess BPMN
+                // These are required by the CMMN processTask which passes them to BPMN
+                variables.put("paymentOfficer", approvedBy.getUsername());
+                variables.put("paymentManager", "admin");
+                
+                // Payment information required by BPMN process
+                variables.put("amount", approveRequestDTO.getApprovedAmount());
+                variables.put("reference", "PAY-" + claimCase.getClaimNumber() + "-" + System.currentTimeMillis());
+                variables.put("payeeName", claimCase.getClaimantName());
+                
+                // Case information for process tracking
+                variables.put("claimId", claimCase.getId().toString());
+                variables.put("caseInstanceId", claimCase.getCaseInstanceId());
+                
                 // 查找并完成Final Approval任务
                 completeCmmnTask(claimCase.getCaseInstanceId(), "taskFinalApproval", variables);
                 
@@ -380,47 +389,15 @@ public class CaseService {
             // Set other required role variables with default values
             variables.put("damageAssessor", "admin");
             variables.put("approverGroup", "managers");
+            variables.put("paymentOfficer", "admin");
+            variables.put("paymentManager", "admin");
             
             // Initialize the DMN output variable to null so it becomes Global
             variables.put("claimComplexity", null);
-
-            // --- Temporary DMN Debugging ---
-            log.debug("Attempting to execute DMN for debugging...");
-            Map<String, Object> dmnInputVariables = new HashMap<>();
-            dmnInputVariables.put("policyType", claimCase.getPolicy().getPolicyType());
-            dmnInputVariables.put("claimedAmount", claimCase.getClaimedAmount());
-            dmnInputVariables.put("coverageAmount", claimCase.getPolicy().getCoverageAmount());
-            dmnInputVariables.put("claimType", claimCase.getClaimType());
-            dmnInputVariables.put("severity", claimCase.getSeverity().toString());
-            // Initialize Approval decision (CRITICAL FIX)
-            variables.put("approved", null); 
-
-            // Initialize Payment status (Prevent future error)
+            // Initialize Approval decision
+            variables.put("approved", null);
+            // Initialize Payment status
             variables.put("paymentStatus", null);
-
-            DmnDecision decision = dmnRepositoryService.createDecisionQuery().decisionKey("ClaimDecisionTable").latestVersion().singleResult();
-            if (decision != null) {
-                log.debug("Found DMN Decision Table with key: {}", decision.getKey());
-                Map<String, Object> dmnResult = dmnDecisionService.executeDecisionWithSingleResult(
-                    dmnDecisionService.createExecuteDecisionBuilder()
-                        .decisionKey("ClaimDecisionTable")
-                        .variables(dmnInputVariables)
-                );
-                log.debug("DMN execution result: {}", dmnResult);
-                if (dmnResult != null) {
-                    log.debug("DMN result entry: {}", dmnResult);
-                    if (dmnResult.containsKey("claimComplexity")) {
-                        log.debug("DMN output 'claimComplexity': {}", dmnResult.get("claimComplexity"));
-                    } else {
-                        log.warn("DMN result does not contain 'claimComplexity' key.");
-                    }
-                } else {
-                    log.warn("DMN execution returned no result.");
-                }
-            } else {
-                log.error("DMN Decision Table 'ClaimDecisionTable' not found.");
-            }
-            // --- End Temporary DMN Debugging ---
 
             org.flowable.cmmn.api.runtime.CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder()
                     .caseDefinitionKey("insuranceClaimCase")

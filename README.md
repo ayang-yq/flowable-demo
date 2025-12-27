@@ -777,6 +777,33 @@ import { CmmnCaseVisualizer } from './CmmnCaseVisualizer';
 3. **流程部署**
    - 自动部署 CMMN、BPMN、DMN 定义
 
+## 🔧 故障排除
+
+### 候选组任务不显示问题
+
+如果使用 `candidateGroups` 的 CMMN 任务在可认领任务列表中不显示，原因如下：
+
+**问题根因：**
+- CMMN 模型使用 `flowable:candidateGroups="${approverGroup}"` 指定候选组
+- Flowable 的 `.taskCandidateUser(userId)` 查询基于 Flowable 自带的 IdentityService 表（ACT_ID_USER, ACT_ID_GROUP）
+- 本系统使用自定义的 User/Role 实体，未与 Flowable IdentityService 同步
+
+**解决方案：**
+`TaskResource.getClaimableTasks()` 已实现角色映射逻辑：
+1. 查询用户自定义角色（ADMIN, MANAGER, APPROVER, etc.）
+2. 将角色名映射到 Flowable 组名（如 "managers"）
+3. 查询所有候选组任务
+4. 合并去重后返回
+
+**角色-组映射：**
+| 应用角色 | Flowable 组 |
+|---------|------------|
+| ADMIN | managers |
+| MANAGER | managers |
+| APPROVER | managers |
+| CLAIM_HANDLER | - |
+| FINANCE | - |
+
 ## 🔍 监控和管理
 
 ### **Admin 管理模块** (NEW)

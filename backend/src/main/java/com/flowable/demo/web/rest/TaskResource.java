@@ -1,7 +1,10 @@
 package com.flowable.demo.web.rest;
 
 import com.flowable.demo.domain.model.ClaimCase;
+import com.flowable.demo.domain.model.Role;
+import com.flowable.demo.domain.model.User;
 import com.flowable.demo.domain.repository.ClaimCaseRepository;
+import com.flowable.demo.domain.repository.UserRepository;
 import com.flowable.demo.web.rest.dto.TaskDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -21,10 +24,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -41,6 +41,7 @@ public class TaskResource {
     private final TaskService taskService;
     private final HistoryService historyService;
     private final ClaimCaseRepository claimCaseRepository;
+    private final UserRepository userRepository;
 
     /**
      * 获取我的待办任务
@@ -72,6 +73,9 @@ public class TaskResource {
 
     /**
      * 获取可认领的任务
+     * 支持两种方式：
+     * 1. 任务直接分配给用户作为候选人 (taskCandidateUser)
+     * 2. 任务分配给候选组，而用户拥有对应的角色
      */
     @GetMapping("/claimable")
     @Operation(summary = "获取可认领任务", description = "获取当前用户可以认领的任务列表")
@@ -80,24 +84,96 @@ public class TaskResource {
             Pageable pageable) {
         log.debug("REST request to get claimable tasks for user: {}", userId);
         
-        List<Task> tasks = cmmnTaskService.createTaskQuery()
-                .taskCandidateUser(userId)
-                .active()
-                .orderByTaskCreateTime().desc()
-                .listPage((int) pageable.getOffset(), pageable.getPageSize());
+        // Try to find user by UUID first, then by username
+        User user = null;
+        try {
+            user = userRepository.findById(UUID.fromString(userId))
+                    .orElse(null);
+        } catch (IllegalArgumentException e) {
+            // userId is not a valid UUID, try by username
+        }
         
-        long total = cmmnTaskService.createTaskQuery()
+        if (user == null) {
+            user = userRepository.findByUsername(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        }
+        
+        // Get all tasks with candidate users directly
+        List<Task> tasksByCandidateUser = cmmnTaskService.createTaskQuery()
                 .taskCandidateUser(userId)
                 .active()
-                .count();
+                .list();
+        
+        // Get all tasks with candidate groups that the user's roles match
+        List<Task> tasksByCandidateGroups = new ArrayList<>();
+        
+        // Map role names to Flowable group names
+        for (Role role : user.getRoles()) {
+            String flowableGroup = mapRoleToGroup(role.getName());
+            if (flowableGroup != null) {
+                List<Task> groupTasks = cmmnTaskService.createTaskQuery()
+                        .taskCandidateGroup(flowableGroup)
+                        .active()
+                        .list();
+                tasksByCandidateGroups.addAll(groupTasks);
+                log.debug("Found {} tasks for user {} with role {} (group: {})", 
+                        groupTasks.size(), userId, role.getName(), flowableGroup);
+            }
+        }
+        
+        // Merge both lists and remove duplicates
+        Set<String> taskIds = new HashSet<>();
+        List<Task> allTasks = new ArrayList<>();
+        
+        for (Task task : tasksByCandidateUser) {
+            if (taskIds.add(task.getId())) {
+                allTasks.add(task);
+            }
+        }
+        
+        for (Task task : tasksByCandidateGroups) {
+            if (taskIds.add(task.getId())) {
+                allTasks.add(task);
+            }
+        }
+        
+        // Sort by creation time
+        allTasks.sort((t1, t2) -> t2.getCreateTime().compareTo(t1.getCreateTime()));
+        
+        // Apply pagination
+        long total = allTasks.size();
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), allTasks.size());
+        List<Task> pagedTasks = start < allTasks.size() ? allTasks.subList(start, end) : new ArrayList<>();
         
         Page<TaskDTO> result = new PageImpl<>(
-                tasks.stream().map(this::convertToDTO).collect(Collectors.toList()),
+                pagedTasks.stream().map(this::convertToDTO).collect(Collectors.toList()),
                 pageable,
                 total
         );
         
+        log.debug("Returning {} claimable tasks for user {} (total: {})", pagedTasks.size(), userId, total);
         return ResponseEntity.ok(result);
+    }
+    
+    /**
+     * Map application role names to Flowable group names
+     */
+    private String mapRoleToGroup(String roleName) {
+        switch (roleName) {
+            case "ADMIN":
+                return "managers"; // Admin can see manager tasks
+            case "MANAGER":
+                return "managers";
+            case "APPROVER":
+                return "managers"; // Approvers are also in managers group for approval tasks
+            case "CLAIM_HANDLER":
+                return null; // No candidate group mapping needed for claim handlers
+            case "FINANCE":
+                return null; // No candidate group mapping needed for finance
+            default:
+                return null;
+        }
     }
 
     /**

@@ -6,6 +6,7 @@
                    xmlns:dc="http://www.omg.org/spec/CMMN/20151109/DC"
                    xmlns:di="http://www.omg.org/spec/CMMN/20151109/DI"
                    targetNamespace="http://flowable.org/cmmn">
+
     <cmmn:case id="insuranceClaimCase" name="Insurance Claim Case" flowable:initiatorVariableName="initiator">
         <cmmn:casePlanModel id="casePlanModel" name="Insurance Claim Plan Model">
 
@@ -13,10 +14,13 @@
             <cmmn:planItem id="planItemStageInvestigation" name="Investigation" definitionRef="stageInvestigation">
                <cmmn:entryCriterion id="entrySentryInvestigation" sentryRef="sentryInvestigationEntry" />
             </cmmn:planItem>
+            
             <cmmn:planItem id="planItemStageApproval" name="Approval" definitionRef="stageApproval">
                 <cmmn:entryCriterion id="entrySentryApproval" sentryRef="sentryApprovalEntry" />
+                <cmmn:entryCriterion id="entrySentryApprovalFromInvestigation" sentryRef="sentryApprovalFromInvestigation" />
                 <cmmn:exitCriterion id="exitSentryApproval" sentryRef="sentryApprovalExit" />
             </cmmn:planItem>
+            
             <cmmn:planItem id="planItemStagePayment" name="Payment" definitionRef="stagePayment">
                 <cmmn:entryCriterion id="entrySentryPayment" sentryRef="sentryPaymentEntry" />
             </cmmn:planItem>
@@ -29,6 +33,7 @@
                     <cmmn:standardEvent>complete</cmmn:standardEvent>
                 </cmmn:planItemOnPart>
             </cmmn:sentry>
+            
             <cmmn:sentry id="sentryInvestigationEntry">
                 <cmmn:planItemOnPart sourceRef="planItemTaskAssessComplexity">
                     <cmmn:standardEvent>complete</cmmn:standardEvent>
@@ -37,11 +42,13 @@
                     <cmmn:condition><![CDATA[${claimComplexity == 'complex'}]]></cmmn:condition>
                 </cmmn:ifPart>
             </cmmn:sentry>
+            
             <cmmn:sentry id="sentryAssessDamageEntry">
                 <cmmn:planItemOnPart sourceRef="planItemTaskGatherDocuments">
                     <cmmn:standardEvent>complete</cmmn:standardEvent>
                 </cmmn:planItemOnPart>
             </cmmn:sentry>
+            
             <cmmn:sentry id="sentryApprovalEntry">
                 <cmmn:planItemOnPart sourceRef="planItemTaskAssessComplexity">
                     <cmmn:standardEvent>complete</cmmn:standardEvent>
@@ -50,11 +57,13 @@
                     <cmmn:condition><![CDATA[${claimComplexity == 'simple'}]]></cmmn:condition>
                 </cmmn:ifPart>
             </cmmn:sentry>
-            <cmmn:sentry id="sentryFinalApprovalEntry">
-                <cmmn:planItemOnPart sourceRef="planItemTaskAssessDamage">
+           
+            <cmmn:sentry id="sentryApprovalFromInvestigation">
+                <cmmn:planItemOnPart sourceRef="planItemStageInvestigation">
                     <cmmn:standardEvent>complete</cmmn:standardEvent>
                 </cmmn:planItemOnPart>
             </cmmn:sentry>
+
             <cmmn:sentry id="sentryApprovalExit">
                 <cmmn:planItemOnPart sourceRef="planItemTaskFinalApproval">
                     <cmmn:standardEvent>complete</cmmn:standardEvent>
@@ -63,6 +72,7 @@
                     <cmmn:condition><![CDATA[${approved == false}]]></cmmn:condition>
                 </cmmn:ifPart>
             </cmmn:sentry>
+ 
             <cmmn:sentry id="sentryPaymentEntry">
                 <cmmn:planItemOnPart sourceRef="planItemTaskFinalApproval">
                     <cmmn:standardEvent>complete</cmmn:standardEvent>
@@ -71,11 +81,13 @@
                     <cmmn:condition><![CDATA[${approved == true}]]></cmmn:condition>
                 </cmmn:ifPart>
             </cmmn:sentry>
+            
             <cmmn:sentry id="sentryClosureEntry">
                 <cmmn:planItemOnPart sourceRef="planItemStagePayment">
                     <cmmn:standardEvent>complete</cmmn:standardEvent>
                 </cmmn:planItemOnPart>
             </cmmn:sentry>
+            
             <cmmn:sentry id="sentryCaseClosedEntry">
                 <cmmn:planItemOnPart sourceRef="planItemTaskNotifyCustomer">
                     <cmmn:standardEvent>complete</cmmn:standardEvent>
@@ -103,9 +115,7 @@
             </cmmn:stage>
 
             <cmmn:stage id="stageApproval" name="Approval">
-                <cmmn:planItem id="planItemTaskFinalApproval" name="Final Claim Approval" definitionRef="taskFinalApproval">
-                    <cmmn:entryCriterion id="entrySentryFinalApproval" sentryRef="sentryFinalApprovalEntry" />
-                </cmmn:planItem>
+                <cmmn:planItem id="planItemTaskFinalApproval" name="Final Claim Approval" definitionRef="taskFinalApproval" />
             </cmmn:stage>
 
             <cmmn:stage id="stagePayment" name="Payment">
@@ -125,6 +135,19 @@
             <cmmn:humanTask id="taskAssessDamage" name="Assess Damages" flowable:assignee="${damageAssessor}" />
             <cmmn:humanTask id="taskFinalApproval" name="Final Claim Approval" flowable:candidateGroups="${approverGroup}" />
             <cmmn:processTask id="taskProcessPayment" name="Process Claim Payment">
+                <cmmn:extensionElements>
+                    <flowable:in source="amount" target="amount" />
+                    <flowable:in source="reference" target="reference" />
+                    <flowable:in source="payeeName" target="payeeName" />
+                    <flowable:in source="claimId" target="claimId" />
+
+                    <flowable:in source="paymentOfficer" target="paymentOfficer" />
+                    <flowable:in source="paymentManager" target="paymentManager" />
+
+                    <flowable:in source="caseInstanceId" target="caseInstanceId" />
+                    
+                    <flowable:out source="paymentStatus" target="paymentStatus" />
+                </cmmn:extensionElements>
                 <cmmn:processRefExpression><![CDATA[ClaimPaymentProcess]]></cmmn:processRefExpression>
             </cmmn:processTask>
             <cmmn:humanTask id="taskNotifyCustomer" name="Notify Customer of Outcome" flowable:assignee="${claimAdjuster}" />
@@ -216,8 +239,8 @@
                 <cmmndi:CMMNLabel />
             </cmmndi:CMMNShape>
 
-            <cmmndi:CMMNShape id="CMMNShape_sentryFinalApprovalEntry" cmmnElementRef="entrySentryFinalApproval">
-                <dc:Bounds height="28" width="18" x="666" y="136" />
+            <cmmndi:CMMNShape id="CMMNShape_sentryApprovalFromInvestigation" cmmnElementRef="entrySentryApprovalFromInvestigation">
+                <dc:Bounds height="28" width="18" x="641" y="100" />
                 <cmmndi:CMMNLabel />
             </cmmndi:CMMNShape>
 
@@ -271,14 +294,14 @@
                 <cmmndi:CMMNLabel />
             </cmmndi:CMMNEdge>
             
-            <cmmndi:CMMNEdge id="CMMNEdge_sentryFinalApprovalEntry_taskAssessDamage" sourceCMMNElementRef="planItemTaskAssessDamage" targetCMMNElementRef="entrySentryFinalApproval">
-                <di:waypoint x="475" y="220" />
-                <di:waypoint x="570" y="220" />
-                <di:waypoint x="570" y="150" />
-                <di:waypoint x="666" y="150" />
+            <cmmndi:CMMNEdge id="CMMNEdge_sentryApprovalFromInvestigation_stageInvestigation" sourceCMMNElementRef="planItemStageInvestigation" targetCMMNElementRef="entrySentryApprovalFromInvestigation">
+                <di:waypoint x="600" y="175" />
+                <di:waypoint x="620" y="175" />
+                <di:waypoint x="620" y="114" />
+                <di:waypoint x="641" y="114" />
                 <cmmndi:CMMNLabel />
             </cmmndi:CMMNEdge>
-            
+
             <cmmndi:CMMNEdge id="CMMNEdge_sentryApprovalExit_taskFinalApproval" sourceCMMNElementRef="planItemTaskFinalApproval" targetCMMNElementRef="exitSentryApproval">
                 <di:waypoint x="775" y="150" />
                 <di:waypoint x="830" y="150" />

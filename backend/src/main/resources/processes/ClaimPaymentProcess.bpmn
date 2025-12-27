@@ -2,11 +2,13 @@
 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
              xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
              targetNamespace="http://flowable.org/bpmn">
 
   <process id="ClaimPaymentProcess" name="理赔支付流程" isExecutable="true">
     
-    <!-- 开始事件 -->
     <startEvent id="startEvent_paymentStart" name="支付开始">
       <extensionElements>
         <flowable:formProperty id="amount" name="支付金额" type="long" required="true" />
@@ -15,7 +17,6 @@
       </extensionElements>
     </startEvent>
 
-    <!-- 支付校验 -->
     <userTask id="userTask_validatePayment" name="支付校验" flowable:assignee="${paymentOfficer}">
       <extensionElements>
         <flowable:formProperty id="amount" name="支付金额" type="long" readonly="true" />
@@ -29,10 +30,8 @@
       </extensionElements>
     </userTask>
 
-    <!-- 排他网关：校验结果分支 -->
-    <exclusiveGateway id="gateway_validationResult" name="校验结果" />
+    <exclusiveGateway id="gateway_validationResult" name="校验结果" default="flow_validate_rejected" />
 
-    <!-- 执行支付 -->
     <serviceTask id="serviceTask_executePayment" name="执行支付" flowable:delegateExpression="${paymentService}">
       <extensionElements>
         <flowable:field name="amount">
@@ -47,7 +46,6 @@
       </extensionElements>
     </serviceTask>
 
-    <!-- 支付确认 -->
     <userTask id="userTask_confirmPayment" name="支付确认" flowable:assignee="${paymentOfficer}">
       <extensionElements>
         <flowable:formProperty id="transactionId" name="交易ID" type="string" readonly="true" />
@@ -62,7 +60,6 @@
       </extensionElements>
     </userTask>
 
-    <!-- 支付被拒绝 -->
     <userTask id="userTask_paymentRejected" name="支付被拒绝" flowable:assignee="${paymentOfficer}">
       <extensionElements>
         <flowable:formProperty id="rejectionReason" name="拒绝原因" type="string" required="true" />
@@ -70,7 +67,6 @@
       </extensionElements>
     </userTask>
 
-    <!-- 更新 Case 状态 -->
     <serviceTask id="serviceTask_updateCase" name="更新 Case 状态" flowable:delegateExpression="${caseService}">
       <extensionElements>
         <flowable:field name="caseInstanceId">
@@ -85,7 +81,6 @@
       </extensionElements>
     </serviceTask>
 
-    <!-- 发送通知 -->
     <serviceTask id="serviceTask_sendNotification" name="发送通知" flowable:delegateExpression="${notificationService}">
       <extensionElements>
         <flowable:field name="notificationType">
@@ -100,10 +95,8 @@
       </extensionElements>
     </serviceTask>
 
-    <!-- 排他网关：确认结果分支 -->
-    <exclusiveGateway id="gateway_confirmationResult" name="确认结果" />
+    <exclusiveGateway id="gateway_confirmationResult" name="确认结果" default="flow_confirm_disputed" />
 
-    <!-- 支付争议处理 -->
     <userTask id="userTask_handleDispute" name="处理支付争议" flowable:assignee="${paymentManager}">
       <extensionElements>
         <flowable:formProperty id="disputeResolution" name="争议解决方案" type="enum" required="true">
@@ -115,83 +108,197 @@
       </extensionElements>
     </userTask>
 
-    <!-- 结束事件：支付成功 -->
     <endEvent id="endEvent_paymentSuccess" name="支付成功">
       <extensionElements>
         <flowable:executionListener event="end" delegateExpression="${paymentCompletionListener}" />
       </extensionElements>
     </endEvent>
 
-    <!-- 结束事件：支付失败 -->
     <endEvent id="endEvent_paymentFailed" name="支付失败">
       <extensionElements>
         <flowable:executionListener event="end" delegateExpression="${paymentFailureListener}" />
       </extensionElements>
     </endEvent>
 
-    <!-- 结束事件：支付争议 -->
-    <endEvent id="endEvent_paymentDisputed" name="支付争议">
-      <extensionElements>
-        <flowable:executionListener event="end" delegateExpression="${paymentDisputeListener}" />
-      </extensionElements>
-    </endEvent>
-
-    <!-- 序列流 -->
     <sequenceFlow id="flow_start_to_validate" sourceRef="startEvent_paymentStart" targetRef="userTask_validatePayment" />
     
     <sequenceFlow id="flow_validate_to_gateway" sourceRef="userTask_validatePayment" targetRef="gateway_validationResult" />
     
-    <!-- 校验通过分支 -->
     <sequenceFlow id="flow_validate_approved" sourceRef="gateway_validationResult" targetRef="serviceTask_executePayment">
       <conditionExpression xsi:type="tFormalExpression">${validationResult == 'approved'}</conditionExpression>
     </sequenceFlow>
     
-    <!-- 校验拒绝分支 -->
-    <sequenceFlow id="flow_validate_rejected" sourceRef="gateway_validationResult" targetRef="userTask_paymentRejected">
-      <conditionExpression xsi:type="tFormalExpression">${validationResult == 'rejected'}</conditionExpression>
-    </sequenceFlow>
+    <sequenceFlow id="flow_validate_rejected" sourceRef="gateway_validationResult" targetRef="userTask_paymentRejected" />
     
     <sequenceFlow id="flow_execute_to_confirm" sourceRef="serviceTask_executePayment" targetRef="userTask_confirmPayment" />
     
     <sequenceFlow id="flow_confirm_to_gateway" sourceRef="userTask_confirmPayment" targetRef="gateway_confirmationResult" />
     
-    <!-- 确认分支 -->
     <sequenceFlow id="flow_confirm_confirmed" sourceRef="gateway_confirmationResult" targetRef="serviceTask_updateCase">
       <conditionExpression xsi:type="tFormalExpression">${confirmationResult == 'confirmed'}</conditionExpression>
     </sequenceFlow>
     
-    <!-- 争议分支 -->
-    <sequenceFlow id="flow_confirm_disputed" sourceRef="gateway_confirmationResult" targetRef="userTask_handleDispute">
-      <conditionExpression xsi:type="tFormalExpression">${confirmationResult == 'disputed'}</conditionExpression>
-    </sequenceFlow>
+    <sequenceFlow id="flow_confirm_disputed" sourceRef="gateway_confirmationResult" targetRef="userTask_handleDispute" />
     
     <sequenceFlow id="flow_rejected_to_updateCase" sourceRef="userTask_paymentRejected" targetRef="serviceTask_updateCase" />
     
     <sequenceFlow id="flow_updateCase_to_notification" sourceRef="serviceTask_updateCase" targetRef="serviceTask_sendNotification" />
     
-    <!-- 争议处理后分支 -->
-    <sequenceFlow id="flow_dispute_to_success" sourceRef="userTask_handleDispute" targetRef="endEvent_paymentSuccess">
+    <sequenceFlow id="flow_dispute_retry" sourceRef="userTask_handleDispute" targetRef="serviceTask_executePayment">
       <conditionExpression xsi:type="tFormalExpression">${disputeResolution == 'retry'}</conditionExpression>
     </sequenceFlow>
     
-    <sequenceFlow id="flow_dispute_to_failed" sourceRef="userTask_handleDispute" targetRef="endEvent_paymentFailed">
+    <sequenceFlow id="flow_dispute_cancel" sourceRef="userTask_handleDispute" targetRef="serviceTask_updateCase">
       <conditionExpression xsi:type="tFormalExpression">${disputeResolution == 'cancel'}</conditionExpression>
     </sequenceFlow>
     
-    <sequenceFlow id="flow_dispute_to_disputed" sourceRef="userTask_handleDispute" targetRef="endEvent_paymentDisputed">
+    <sequenceFlow id="flow_dispute_investigate" sourceRef="userTask_handleDispute" targetRef="serviceTask_updateCase">
       <conditionExpression xsi:type="tFormalExpression">${disputeResolution == 'investigate'}</conditionExpression>
     </sequenceFlow>
     
-    <!-- 支付成功路径 -->
     <sequenceFlow id="flow_notification_to_success" sourceRef="serviceTask_sendNotification" targetRef="endEvent_paymentSuccess">
       <conditionExpression xsi:type="tFormalExpression">${paymentStatus == 'completed'}</conditionExpression>
     </sequenceFlow>
     
-    <!-- 支付失败路径 -->
     <sequenceFlow id="flow_notification_to_failed" sourceRef="serviceTask_sendNotification" targetRef="endEvent_paymentFailed">
-      <conditionExpression xsi:type="tFormalExpression">${paymentStatus == 'failed'}</conditionExpression>
+      <conditionExpression xsi:type="tFormalExpression">${paymentStatus != 'completed'}</conditionExpression>
     </sequenceFlow>
 
   </process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_ClaimPaymentProcess">
+    <bpmndi:BPMNPlane bpmnElement="ClaimPaymentProcess" id="BPMNPlane_ClaimPaymentProcess">
+      
+      <bpmndi:BPMNShape bpmnElement="startEvent_paymentStart" id="BPMNShape_startEvent_paymentStart">
+        <omgdc:Bounds height="30.0" width="30.0" x="100.0" y="163.0"/>
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape bpmnElement="userTask_validatePayment" id="BPMNShape_userTask_validatePayment">
+        <omgdc:Bounds height="80.0" width="100.0" x="180.0" y="138.0"/>
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape bpmnElement="gateway_validationResult" id="BPMNShape_gateway_validationResult">
+        <omgdc:Bounds height="40.0" width="40.0" x="330.0" y="158.0"/>
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape bpmnElement="serviceTask_executePayment" id="BPMNShape_serviceTask_executePayment">
+        <omgdc:Bounds height="80.0" width="100.0" x="420.0" y="138.0"/>
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape bpmnElement="userTask_paymentRejected" id="BPMNShape_userTask_paymentRejected">
+        <omgdc:Bounds height="80.0" width="100.0" x="420.0" y="250.0"/>
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape bpmnElement="userTask_confirmPayment" id="BPMNShape_userTask_confirmPayment">
+        <omgdc:Bounds height="80.0" width="100.0" x="570.0" y="138.0"/>
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape bpmnElement="gateway_confirmationResult" id="BPMNShape_gateway_confirmationResult">
+        <omgdc:Bounds height="40.0" width="40.0" x="720.0" y="158.0"/>
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape bpmnElement="userTask_handleDispute" id="BPMNShape_userTask_handleDispute">
+        <omgdc:Bounds height="80.0" width="100.0" x="720.0" y="30.0"/>
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape bpmnElement="serviceTask_updateCase" id="BPMNShape_serviceTask_updateCase">
+        <omgdc:Bounds height="80.0" width="100.0" x="850.0" y="138.0"/>
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape bpmnElement="serviceTask_sendNotification" id="BPMNShape_serviceTask_sendNotification">
+        <omgdc:Bounds height="80.0" width="100.0" x="1000.0" y="138.0"/>
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape bpmnElement="endEvent_paymentSuccess" id="BPMNShape_endEvent_paymentSuccess">
+        <omgdc:Bounds height="28.0" width="28.0" x="1180.0" y="164.0"/>
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape bpmnElement="endEvent_paymentFailed" id="BPMNShape_endEvent_paymentFailed">
+        <omgdc:Bounds height="28.0" width="28.0" x="1180.0" y="276.0"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge bpmnElement="flow_start_to_validate" id="BPMNEdge_flow_start_to_validate">
+        <omgdi:waypoint x="130.0" y="178.0"/>
+        <omgdi:waypoint x="180.0" y="178.0"/>
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge bpmnElement="flow_validate_to_gateway" id="BPMNEdge_flow_validate_to_gateway">
+        <omgdi:waypoint x="280.0" y="178.0"/>
+        <omgdi:waypoint x="330.0" y="178.0"/>
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge bpmnElement="flow_validate_approved" id="BPMNEdge_flow_validate_approved">
+        <omgdi:waypoint x="370.0" y="178.0"/>
+        <omgdi:waypoint x="420.0" y="178.0"/>
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge bpmnElement="flow_validate_rejected" id="BPMNEdge_flow_validate_rejected">
+        <omgdi:waypoint x="350.0" y="198.0"/>
+        <omgdi:waypoint x="350.0" y="290.0"/>
+        <omgdi:waypoint x="420.0" y="290.0"/>
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge bpmnElement="flow_execute_to_confirm" id="BPMNEdge_flow_execute_to_confirm">
+        <omgdi:waypoint x="520.0" y="178.0"/>
+        <omgdi:waypoint x="570.0" y="178.0"/>
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge bpmnElement="flow_confirm_to_gateway" id="BPMNEdge_flow_confirm_to_gateway">
+        <omgdi:waypoint x="670.0" y="178.0"/>
+        <omgdi:waypoint x="720.0" y="178.0"/>
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge bpmnElement="flow_confirm_confirmed" id="BPMNEdge_flow_confirm_confirmed">
+        <omgdi:waypoint x="760.0" y="178.0"/>
+        <omgdi:waypoint x="850.0" y="178.0"/>
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge bpmnElement="flow_confirm_disputed" id="BPMNEdge_flow_confirm_disputed">
+        <omgdi:waypoint x="740.0" y="158.0"/>
+        <omgdi:waypoint x="740.0" y="110.0"/>
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge bpmnElement="flow_rejected_to_updateCase" id="BPMNEdge_flow_rejected_to_updateCase">
+        <omgdi:waypoint x="520.0" y="290.0"/>
+        <omgdi:waypoint x="900.0" y="290.0"/>
+        <omgdi:waypoint x="900.0" y="218.0"/>
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge bpmnElement="flow_updateCase_to_notification" id="BPMNEdge_flow_updateCase_to_notification">
+        <omgdi:waypoint x="950.0" y="178.0"/>
+        <omgdi:waypoint x="1000.0" y="178.0"/>
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge bpmnElement="flow_dispute_retry" id="BPMNEdge_flow_dispute_retry">
+        <omgdi:waypoint x="720.0" y="70.0"/>
+        <omgdi:waypoint x="470.0" y="70.0"/>
+        <omgdi:waypoint x="470.0" y="138.0"/>
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge bpmnElement="flow_dispute_cancel" id="BPMNEdge_flow_dispute_cancel">
+        <omgdi:waypoint x="820.0" y="70.0"/>
+        <omgdi:waypoint x="900.0" y="70.0"/>
+        <omgdi:waypoint x="900.0" y="138.0"/>
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge bpmnElement="flow_dispute_investigate" id="BPMNEdge_flow_dispute_investigate">
+        <omgdi:waypoint x="820.0" y="90.0"/>
+        <omgdi:waypoint x="880.0" y="90.0"/>
+        <omgdi:waypoint x="880.0" y="138.0"/>
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge bpmnElement="flow_notification_to_success" id="BPMNEdge_flow_notification_to_success">
+        <omgdi:waypoint x="1100.0" y="178.0"/>
+        <omgdi:waypoint x="1180.0" y="178.0"/>
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge bpmnElement="flow_notification_to_failed" id="BPMNEdge_flow_notification_to_failed">
+        <omgdi:waypoint x="1050.0" y="218.0"/>
+        <omgdi:waypoint x="1050.0" y="290.0"/>
+        <omgdi:waypoint x="1180.0" y="290.0"/>
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
 
 </definitions>

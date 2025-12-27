@@ -11,7 +11,6 @@ import org.flowable.cmmn.api.CmmnRuntimeService;
 import org.flowable.cmmn.api.CmmnTaskService;
 import org.flowable.cmmn.api.runtime.CaseInstance;
 import org.flowable.cmmn.api.runtime.CaseInstanceBuilder;
-import org.flowable.dmn.api.ExecuteDecisionBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,12 +48,6 @@ class CaseServiceTest {
 
     @Mock
     private CmmnTaskService cmmnTaskService;
-
-    @Mock
-    private org.flowable.dmn.api.DmnRepositoryService dmnRepositoryService;
-
-    @Mock
-    private org.flowable.dmn.api.DmnDecisionService dmnDecisionService;
 
     @InjectMocks
     private CaseService caseService;
@@ -121,21 +114,6 @@ class CaseServiceTest {
         when(caseInstanceBuilder.variables(anyMap())).thenReturn(caseInstanceBuilder);
         when(caseInstanceBuilder.start()).thenReturn(caseInstance);
         when(caseInstance.getId()).thenReturn(UUID.randomUUID().toString());
-
-        // Mock DMN services
-        org.flowable.dmn.api.DmnDecision dmnDecision = mock(org.flowable.dmn.api.DmnDecision.class);
-        org.flowable.dmn.api.DmnDecisionQuery dmnDecisionQuery = mock(org.flowable.dmn.api.DmnDecisionQuery.class);
-        when(dmnRepositoryService.createDecisionQuery()).thenReturn(dmnDecisionQuery);
-        when(dmnDecisionQuery.decisionKey(anyString())).thenReturn(dmnDecisionQuery);
-        when(dmnDecisionQuery.latestVersion()).thenReturn(dmnDecisionQuery);
-        when(dmnDecisionQuery.singleResult()).thenReturn(dmnDecision);
-        when(dmnDecision.getKey()).thenReturn("ClaimDecisionTable");
-
-        ExecuteDecisionBuilder dmnExecuteDecisionBuilder = mock(ExecuteDecisionBuilder.class);
-        when(dmnDecisionService.createExecuteDecisionBuilder()).thenReturn(dmnExecuteDecisionBuilder);
-        when(dmnExecuteDecisionBuilder.decisionKey(anyString())).thenReturn(dmnExecuteDecisionBuilder);
-        when(dmnExecuteDecisionBuilder.variables(anyMap())).thenReturn(dmnExecuteDecisionBuilder);
-        when(dmnDecisionService.executeDecisionWithSingleResult(dmnExecuteDecisionBuilder)).thenReturn(Map.of("claimComplexity", "MEDIUM"));
 
         ClaimCase result = caseService.createClaimCase(claimCaseDTO);
 
