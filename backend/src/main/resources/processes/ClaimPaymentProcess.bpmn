@@ -14,6 +14,7 @@
         <flowable:formProperty id="amount" name="支付金额" type="long" required="true" />
         <flowable:formProperty id="reference" name="支付参考号" type="string" required="true" />
         <flowable:formProperty id="payeeName" name="收款人姓名" type="string" required="true" />
+        <flowable:executionListener event="start" delegateExpression="${paymentBpmnListener}" />
       </extensionElements>
     </startEvent>
 
@@ -27,6 +28,7 @@
           <flowable:value id="rejected" name="拒绝" />
         </flowable:formProperty>
         <flowable:formProperty id="validationComment" name="校验备注" type="string" />
+        <flowable:executionListener event="start" delegateExpression="${paymentBpmnListener}" />
       </extensionElements>
     </userTask>
 
@@ -43,6 +45,7 @@
         <flowable:field name="payeeName">
           <flowable:expression>${payeeName}</flowable:expression>
         </flowable:field>
+        <flowable:executionListener event="start" delegateExpression="${paymentBpmnListener}" />
       </extensionElements>
     </serviceTask>
 
@@ -57,6 +60,7 @@
           <flowable:value id="disputed" name="争议" />
         </flowable:formProperty>
         <flowable:formProperty id="confirmationComment" name="确认备注" type="string" />
+        <flowable:executionListener event="start" delegateExpression="${paymentBpmnListener}" />
       </extensionElements>
     </userTask>
 
@@ -64,6 +68,7 @@
       <extensionElements>
         <flowable:formProperty id="rejectionReason" name="拒绝原因" type="string" required="true" />
         <flowable:formProperty id="rejectionComment" name="拒绝备注" type="string" />
+        <flowable:executionListener event="start" delegateExpression="${paymentBpmnListener}" />
       </extensionElements>
     </userTask>
 
@@ -105,18 +110,19 @@
           <flowable:value id="investigate" name="调查" />
         </flowable:formProperty>
         <flowable:formProperty id="disputeComment" name="争议处理备注" type="string" />
+        <flowable:executionListener event="start" delegateExpression="${paymentBpmnListener}" />
       </extensionElements>
     </userTask>
 
     <endEvent id="endEvent_paymentSuccess" name="支付成功">
       <extensionElements>
-        <flowable:executionListener event="end" delegateExpression="${paymentCompletionListener}" />
+        <flowable:executionListener event="end" delegateExpression="${paymentBpmnListener}" />
       </extensionElements>
     </endEvent>
 
     <endEvent id="endEvent_paymentFailed" name="支付失败">
       <extensionElements>
-        <flowable:executionListener event="end" delegateExpression="${paymentFailureListener}" />
+        <flowable:executionListener event="end" delegateExpression="${paymentBpmnListener}" />
       </extensionElements>
     </endEvent>
 

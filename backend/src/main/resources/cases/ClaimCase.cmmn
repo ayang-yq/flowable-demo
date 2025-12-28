@@ -140,15 +140,11 @@
                     <flowable:planItemLifecycleListener sourceState="available" targetState="active" delegateExpression="${claimStateListener}">
                         <flowable:field name="status" stringValue="APPROVED" />
                     </flowable:planItemLifecycleListener>
-                    <flowable:planItemLifecycleListener sourceState="available" targetState="active" delegateExpression="${paymentCompletionListener}" />
                 </cmmn:extensionElements>
                 <cmmn:planItem id="planItemTaskProcessPayment" name="Process Claim Payment" definitionRef="taskProcessPayment" />
             </cmmn:stage>
 
             <cmmn:stage id="stageClosure" name="Closure">
-                <cmmn:extensionElements>
-                    <flowable:planItemLifecycleListener sourceState="available" targetState="active" delegateExpression="${paymentCompletionListener}" />
-                </cmmn:extensionElements>
                 <cmmn:planItem id="planItemTaskNotifyCustomer" name="Notify Customer of Outcome" definitionRef="taskNotifyCustomer" />
                 <cmmn:planItem id="planItemMilestoneCaseClosed" name="Case Closed" definitionRef="milestoneCaseClosed">
                     <cmmn:entryCriterion id="entrySentryCaseClosed" sentryRef="sentryCaseClosedEntry" />

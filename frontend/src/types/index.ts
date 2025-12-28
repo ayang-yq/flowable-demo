@@ -40,7 +40,10 @@ export interface ClaimCase {
   incidentDescription: string;
   claimedAmount: number;
   approvedAmount?: number;
+  paymentStatus?: 'NOT_STARTED' | 'PROCESSING' | 'PAID' | 'PAYMENT_REJECTED' | 'PAYMENT_FAILED' | 'DISPUTED';
+  transactionId?: string;
   paidAmount?: number;
+  paymentDate?: string;
   assignedToId?: string;
   assignedToName?: string;
   createdById: string;

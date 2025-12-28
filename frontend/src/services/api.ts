@@ -119,24 +119,14 @@ export const claimApi = {
     return api.get('/cases/by-assignee', { params: { userId, ...params } });
   },
 
-  // 审批理赔案件
-  approveClaim: (id: string, userId: string, variables?: any): Promise<AxiosResponse<void>> => {
-    return api.post(`/cases/${id}/approve`, variables, { params: { userId } });
-  },
-
-  // 拒绝理赔案件
-  rejectClaim: (id: string, reason: string): Promise<AxiosResponse<void>> => {
-    return api.post(`/cases/${id}/reject`, { reason });
-  },
-
   // 支付理赔案件
   payClaim: (id: string, paymentData: any): Promise<AxiosResponse<void>> => {
     return api.post(`/cases/${id}/pay`, paymentData);
   },
 
-  // 完成审核任务
-  completeReview: (id: string, userId: string, reviewData?: any): Promise<AxiosResponse<void>> => {
-    return api.post(`/cases/${id}/complete-review`, reviewData || {}, { params: { userId } });
+  // 关闭理赔案件
+  closeClaim: (id: string, userId: string, closureReason?: string): Promise<AxiosResponse<ClaimCase>> => {
+    return api.post(`/cases/${id}/close`, null, { params: { userId, closureReason } });
   },
 };
 

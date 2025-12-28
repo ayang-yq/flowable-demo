@@ -20,7 +20,8 @@ import {
   Spin,
   Row,
   Col,
-  Divider
+  Divider,
+  Alert
 } from 'antd';
 import { 
   ArrowLeftOutlined, 
@@ -48,11 +49,9 @@ const ClaimDetail: React.FC = () => {
   const [tasks, setTasks] = useState<any>(null);
   const [currentTask, setCurrentTask] = useState<any>(null);
   const [taskActionModalVisible, setTaskActionModalVisible] = useState(false);
-  const [approveModalVisible, setApproveModalVisible] = useState(false);
-  const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
-  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [closeModalVisible, setCloseModalVisible] = useState(false);
   
   // 任务相关状态
   const [taskVariables, setTaskVariables] = useState<Record<string, any>>({});
@@ -141,36 +140,6 @@ const ClaimDetail: React.FC = () => {
     }
   };
 
-  const handleApprove = async (values: any) => {
-    try {
-      // Get current user from localStorage
-      const userStr = localStorage.getItem('user');
-      const user = userStr ? JSON.parse(userStr) : null;
-      
-      await claimApi.approveClaim(id!, user?.id || 'admin', values);
-      message.success('审批成功');
-      setApproveModalVisible(false);
-      loadClaimDetail();
-      loadTasks();
-    } catch (error) {
-      console.error('Failed to approve claim:', error);
-      message.error('审批失败');
-    }
-  };
-
-  const handleReject = async (values: any) => {
-    try {
-      await claimApi.rejectClaim(id!, values.reason);
-      message.success('拒绝成功');
-      setRejectModalVisible(false);
-      loadClaimDetail();
-      loadTasks();
-    } catch (error) {
-      console.error('Failed to reject claim:', error);
-      message.error('拒绝失败');
-    }
-  };
-
   const handlePay = async (values: any) => {
     try {
       // Get current user from localStorage
@@ -210,26 +179,21 @@ const ClaimDetail: React.FC = () => {
     }
   };
 
-  const handleCompleteReview = async (values: any) => {
+  const handleCloseClaim = async (values: any) => {
     try {
       // Get current user from localStorage
       const userStr = localStorage.getItem('user');
       const user = userStr ? JSON.parse(userStr) : null;
       
-      const reviewData = {
-        reviewComments: values.comments,
-        reviewNotes: values.notes
-      };
-      
-      await claimApi.completeReview(id!, user?.id || 'admin', reviewData);
-      message.success('审核完成');
-      setReviewModalVisible(false);
+      await claimApi.closeClaim(id!, user?.id || 'admin', values.closureReason);
+      message.success('案件已关闭');
+      setCloseModalVisible(false);
       form.resetFields();
       loadClaimDetail();
       loadTasks();
     } catch (error) {
-      console.error('Failed to complete review:', error);
-      message.error('审核完成失败');
+      console.error('Failed to close claim:', error);
+      message.error('关闭案件失败');
     }
   };
 
@@ -538,6 +502,30 @@ const ClaimDetail: React.FC = () => {
     return texts[severity] || severity;
   };
 
+  const getPaymentStatusColor = (paymentStatus: string) => {
+    const colors: { [key: string]: string } = {
+      'NOT_STARTED': 'default',
+      'PROCESSING': 'processing',
+      'PAID': 'success',
+      'PAYMENT_REJECTED': 'error',
+      'PAYMENT_FAILED': 'error',
+      'DISPUTED': 'warning'
+    };
+    return colors[paymentStatus] || 'default';
+  };
+
+  const getPaymentStatusText = (paymentStatus: string) => {
+    const texts: { [key: string]: string } = {
+      'NOT_STARTED': '未开始',
+      'PROCESSING': '处理中',
+      'PAID': '支付成功',
+      'PAYMENT_REJECTED': '支付被拒绝',
+      'PAYMENT_FAILED': '支付失败',
+      'DISPUTED': '争议中'
+    };
+    return texts[paymentStatus] || paymentStatus;
+  };
+
   const getTaskTypeText = (task: any) => {
     // Use the task name if available, otherwise fall back to the mapped text from taskDefinitionKey
     if (task.name) {
@@ -627,15 +615,8 @@ const ClaimDetail: React.FC = () => {
     <div>
       {/* 页面头部 */}
       <Card style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Button 
-              icon={<ArrowLeftOutlined />} 
-              onClick={() => navigate('/claims')}
-              style={{ marginRight: 16 }}
-            >
-              返回
-            </Button>
             <div>
               <h2 style={{ margin: 0 }}>理赔详情 - {claim.claimNumber}</h2>
               <Space style={{ marginTop: 8 }}>
@@ -649,37 +630,22 @@ const ClaimDetail: React.FC = () => {
             </div>
           </div>
           <Space>
-            <Button 
-              icon={<EditOutlined />} 
-              onClick={() => navigate(`/claims/${id}/edit`)}
-            >
-              编辑
-            </Button>
-            {claim.status === 'SUBMITTED' && (
+            {claim.status !== 'CLOSED' && (
               <Button 
-                type="primary" 
-                onClick={() => setReviewModalVisible(true)}
+                icon={<EditOutlined />} 
+                onClick={() => navigate(`/claims/${id}/edit`)}
               >
-                完成审核
+                编辑
               </Button>
             )}
-            {claim.status === 'UNDER_REVIEW' && (
-              <>
-                <Button 
-                  type="primary" 
-                  icon={<CheckCircleOutlined />}
-                  onClick={() => setApproveModalVisible(true)}
-                >
-                  批准
-                </Button>
-                <Button 
-                  danger 
-                  icon={<CloseCircleOutlined />}
-                  onClick={() => setRejectModalVisible(true)}
-                >
-                  拒绝
-                </Button>
-              </>
+            {(claim.status === 'PAID' || claim.status === 'REJECTED') && (
+              <Button 
+                danger
+                icon={<CloseCircleOutlined />}
+                onClick={() => setCloseModalVisible(true)}
+              >
+                关闭案件
+              </Button>
             )}
             {claim.status === 'APPROVED' && (
               <Button 
@@ -690,11 +656,13 @@ const ClaimDetail: React.FC = () => {
                 支付
               </Button>
             )}
-            <Button 
-              onClick={() => setAssignModalVisible(true)}
-            >
-              分配
-            </Button>
+            {claim.status !== 'CLOSED' && (
+              <Button 
+                onClick={() => setAssignModalVisible(true)}
+              >
+                分配
+              </Button>
+            )}
           </Space>
         </div>
       </Card>
@@ -736,6 +704,19 @@ const ClaimDetail: React.FC = () => {
                     {claim.paidAmount ? (
                       <span className="amount-display">¥{claim.paidAmount.toLocaleString()}</span>
                     ) : '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="支付状态">
+                    {claim.paymentStatus ? (
+                      <Tag color={getPaymentStatusColor(claim.paymentStatus)}>
+                        {getPaymentStatusText(claim.paymentStatus)}
+                      </Tag>
+                    ) : '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="交易ID">
+                    {claim.transactionId || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="支付日期">
+                    {claim.paymentDate ? claim.paymentDate : '-'}
                   </Descriptions.Item>
                   <Descriptions.Item label="分配给">
                     {claim.assignedToName || '-'}
@@ -1041,52 +1022,6 @@ const ClaimDetail: React.FC = () => {
           </Card>
         </Col>
       </Row>
-
-      {/* 审批模态框 */}
-      <Modal
-        title="批准理赔"
-        visible={approveModalVisible}
-        onCancel={() => setApproveModalVisible(false)}
-        onOk={() => form.submit()}
-      >
-        <Form form={form} onFinish={handleApprove}>
-          <Form.Item 
-            name="approvedAmount" 
-            label="批准金额" 
-            rules={[{ required: true, message: '请输入批准金额' }]}
-            initialValue={claim.claimedAmount}
-          >
-            <InputNumber 
-              style={{ width: '100%' }} 
-              min={0} 
-              max={claim.claimedAmount}
-              formatter={value => `¥ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={currencyParser}
-            />
-          </Form.Item>
-          <Form.Item name="comments" label="审批意见">
-            <TextArea rows={4} />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* 拒绝模态框 */}
-      <Modal
-        title="拒绝理赔"
-        visible={rejectModalVisible}
-        onCancel={() => setRejectModalVisible(false)}
-        onOk={() => form.submit()}
-      >
-        <Form form={form} onFinish={handleReject}>
-          <Form.Item 
-            name="reason" 
-            label="拒绝原因" 
-            rules={[{ required: true, message: '请输入拒绝原因' }]}
-          >
-            <TextArea rows={4} />
-          </Form.Item>
-        </Form>
-      </Modal>
 
       {/* 支付模态框 */}
       <Modal
@@ -1491,42 +1426,42 @@ const ClaimDetail: React.FC = () => {
         </Form>
       </Modal>
 
-      {/* 完成审核模态框 */}
+      {/* 关闭案件模态框 */}
       <Modal
-        title="审核理赔申请"
-        visible={reviewModalVisible}
+        title="关闭理赔案件"
+        visible={closeModalVisible}
         onCancel={() => {
-          setReviewModalVisible(false);
+          setCloseModalVisible(false);
           form.resetFields();
         }}
         onOk={() => form.submit()}
-        okText="提交审核"
+        okText="确认关闭"
         cancelText="取消"
+        okButtonProps={{ danger: true }}
       >
+        <Alert
+          message="警告"
+          description="关闭案件将终止相关的Case实例，此操作不可逆。"
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
         <Form 
           form={form} 
-          onFinish={handleCompleteReview}
+          onFinish={handleCloseClaim}
           layout="vertical"
         >
           <Form.Item 
-            name="comments" 
-            label="审核意见" 
-            rules={[{ required: true, message: '请填写审核意见' }]}
-            help="请简要说明审核结果，例如：申请材料齐全，符合理赔条件"
+            name="closureReason" 
+            label="关闭原因" 
+            rules={[{ required: true, message: '请填写关闭原因' }]}
+            help="请简要说明关闭案件的原因，例如：申请人撤回申请、材料不全等"
           >
             <TextArea 
               rows={4} 
-              placeholder="请填写审核意见" 
+              placeholder="请填写关闭原因" 
               showCount
               maxLength={500}
-            />
-          </Form.Item>
-          <Form.Item name="notes" label="备注">
-            <TextArea 
-              rows={3} 
-              placeholder="其他需要记录的信息（可选）"
-              showCount
-              maxLength={300}
             />
           </Form.Item>
         </Form>

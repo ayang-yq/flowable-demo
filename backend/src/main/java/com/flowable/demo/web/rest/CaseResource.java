@@ -421,6 +421,40 @@ public class CaseResource {
     }
 
     /**
+     * 关闭理赔案件
+     */
+    @PostMapping("/{id}/close")
+    @Operation(summary = "关闭理赔案件", description = "关闭指定的理赔案件并终止关联的Case实例")
+    @Transactional
+    public ResponseEntity<ClaimCaseDTO> closeClaimCase(
+            @Parameter(description = "案件ID") @PathVariable String id,
+            @Parameter(description = "关闭原因") @RequestParam(required = false) String closureReason,
+            @Parameter(description = "操作用户ID") @RequestParam String userId) {
+        log.debug("REST request to close ClaimCase : {} by user : {} with reason : {}", id, userId, closureReason);
+
+        // 尝试将 ID 解析为 UUID 或 Case Instance ID
+        UUID caseId;
+        try {
+            caseId = UUID.fromString(id);
+        } catch (IllegalArgumentException e) {
+            // 如果不是有效的 UUID，尝试通过 Case Instance ID 查找
+            ClaimCase claimCase = claimCaseRepository.findByCaseInstanceId(id)
+                    .orElseThrow(() -> new IllegalArgumentException("Claim case not found with id: " + id));
+            caseId = claimCase.getId();
+        }
+
+        // 验证案件是否存在
+        if (!claimCaseRepository.existsById(caseId)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        ClaimCase result = caseService.closeClaimCase(caseId, closureReason, userId);
+        ClaimCaseDTO resultDTO = convertToDTO(result);
+
+        return ResponseEntity.ok(resultDTO);
+    }
+
+    /**
      * 获取案件统计信息
      */
     @GetMapping("/statistics")
@@ -481,6 +515,18 @@ public class CaseResource {
 
         if (claimCase.getApprovedAmount() != null) {
             dto.setApprovedAmount(claimCase.getApprovedAmount().doubleValue());
+        }
+
+        // Payment status information
+        dto.setPaymentStatus(claimCase.getPaymentStatus() != null ? claimCase.getPaymentStatus().name() : null);
+        dto.setTransactionId(claimCase.getTransactionId());
+        
+        if (claimCase.getPaidAmount() != null) {
+            dto.setPaidAmount(claimCase.getPaidAmount().doubleValue());
+        }
+        
+        if (claimCase.getPaymentDate() != null) {
+            dto.setPaymentDate(claimCase.getPaymentDate().format(DateTimeFormatter.ISO_LOCAL_DATE));
         }
 
         dto.setClaimType(claimCase.getClaimType());

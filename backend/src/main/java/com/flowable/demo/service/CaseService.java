@@ -85,6 +85,12 @@ public class CaseService {
             // 3. 更新 ClaimCase 的 caseInstanceId
             claimCase.setCaseInstanceId(caseInstanceId);
             claimCaseRepository.save(claimCase);
+            
+            // 4. Set caseInstanceId as a variable in the CMMN case instance
+            // This is needed so the BPMN process called from CMMN can access it
+            cmmnRuntimeService.setVariable(caseInstanceId, "caseInstanceId", caseInstanceId);
+            log.info("Set caseInstanceId variable for case instance: {}", caseInstanceId);
+            
             log.info("Claim case {} updated with case instance ID: {}", claimCase.getId(), caseInstanceId);
         } else {
             log.warn("Failed to start case process for claim case {}", claimCase.getId());
@@ -617,6 +623,47 @@ public class CaseService {
         } catch (Exception e) {
             log.error("Failed to complete CMMN task {}: {}", taskDefinitionKey, e.getMessage(), e);
         }
+    }
+
+    /**
+     * 关闭理赔案件
+     */
+    public ClaimCase closeClaimCase(UUID caseId, String closureReason, String userId) {
+        log.debug("Closing claim case {} by user {} with reason: {}", caseId, userId, closureReason);
+
+        ClaimCase claimCase = claimCaseRepository.findById(caseId)
+                .orElseThrow(() -> new IllegalArgumentException("Claim case not found"));
+
+        // 检查是否可以关闭
+        if (!claimCase.canClose()) {
+            throw new IllegalStateException("Claim case cannot be closed in current status: " + claimCase.getStatus());
+        }
+
+        User closedBy = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // 构建关闭描述
+        String description = "Case closed by " + closedBy.getFullName();
+        if (closureReason != null && !closureReason.isBlank()) {
+            description += " - " + closureReason;
+        }
+
+        // 更新状态为已关闭
+        claimCase.updateStatus("CLOSED", description, closedBy);
+        claimCaseRepository.save(claimCase);
+
+        // 关闭关联的 Case Instance
+        if (claimCase.getCaseInstanceId() != null) {
+            try {
+                cmmnRuntimeService.deleteCaseInstance(claimCase.getCaseInstanceId());
+                log.info("Closed case instance {} for claim case {}", claimCase.getCaseInstanceId(), claimCase.getId());
+            } catch (Exception e) {
+                log.error("Failed to close case instance {}: {}", claimCase.getCaseInstanceId(), e.getMessage(), e);
+                // 继续执行，即使关闭 case instance 失败
+            }
+        }
+
+        return claimCase;
     }
 
     /**

@@ -2,6 +2,7 @@ package com.flowable.demo.service;
 
 import com.flowable.demo.domain.model.ClaimCase;
 import com.flowable.demo.domain.model.ClaimCase.ClaimStatus;
+import com.flowable.demo.domain.model.ClaimCase.PaymentStatus;
 import com.flowable.demo.domain.repository.ClaimCaseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,9 +46,15 @@ public class PaymentUpdateService implements JavaDelegate {
                 updateClaimStatusByActivity(claimCase, currentActivityId, execution);
                 
                 // 更新支付相关字段
-                if (paymentStatus != null) {
-                    claimCase.setPaymentStatus(paymentStatus);
-                }
+        if (paymentStatus != null) {
+            // 将字符串状态转换为PaymentStatus枚举
+            try {
+                PaymentStatus status = PaymentStatus.valueOf(paymentStatus);
+                claimCase.setPaymentStatus(status);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid payment status: {}, keeping current status", paymentStatus);
+            }
+        }
                 
                 if (transactionId != null) {
                     claimCase.setTransactionId(transactionId);
@@ -77,27 +84,27 @@ public class PaymentUpdateService implements JavaDelegate {
         
         switch (activityId) {
             case "startEvent_paymentStart":
-                // 支付流程开始，更新为支付进行中
-                log.info("Payment process started, setting paymentStatus to PAYMENT_IN_PROGRESS");
-                claimCase.setPaymentStatus("PAYMENT_IN_PROGRESS");
+                // 支付流程开始，更新为处理中
+                log.info("Payment process started, setting paymentStatus to PROCESSING");
+                claimCase.setPaymentStatus(PaymentStatus.PROCESSING);
                 break;
                 
             case "serviceTask_executePayment":
-                // 执行支付
-                log.info("Executing payment, setting paymentStatus to PAYING");
-                claimCase.setPaymentStatus("PAYING");
+                // 执行支付，保持为处理中
+                log.info("Executing payment, paymentStatus remains PROCESSING");
+                claimCase.setPaymentStatus(PaymentStatus.PROCESSING);
                 break;
                 
             case "userTask_confirmPayment":
-                // 等待确认
-                log.info("Awaiting payment confirmation, setting paymentStatus to AWAITING_CONFIRMATION");
-                claimCase.setPaymentStatus("AWAITING_CONFIRMATION");
+                // 等待确认，保持为处理中
+                log.info("Awaiting payment confirmation, paymentStatus remains PROCESSING");
+                claimCase.setPaymentStatus(PaymentStatus.PROCESSING);
                 break;
                 
             case "userTask_paymentRejected":
                 // 支付被拒绝
                 log.info("Payment rejected, setting paymentStatus to PAYMENT_REJECTED and status to REJECTED");
-                claimCase.setPaymentStatus("PAYMENT_REJECTED");
+                claimCase.setPaymentStatus(PaymentStatus.PAYMENT_REJECTED);
                 claimCase.setStatus(ClaimStatus.REJECTED);
                 break;
                 
@@ -110,24 +117,17 @@ public class PaymentUpdateService implements JavaDelegate {
 
     /**
      * 根据支付状态更新主状态
+     * 注意：实际的状态更新主要由PaymentBpmnListener在流程结束时处理
+     * 这里只处理中间状态的临时更新
      */
     private void updateMainStatusByPaymentStatus(ClaimCase claimCase, String paymentStatus) {
+        // 这个方法主要用于中间状态的临时更新
+        // 最终状态由PaymentBpmnListener在流程结束时统一处理
         if (paymentStatus == null) {
             return;
         }
         
-        if ("PAID".equals(paymentStatus)) {
-            // 支付成功，等待Closure Stage完成
-            log.info("Payment successful, setting status to PAID");
-            claimCase.setStatus(ClaimStatus.PAID);
-            if (claimCase.getApprovedAmount() != null) {
-                claimCase.setPaidAmount(claimCase.getApprovedAmount());
-            }
-            claimCase.setPaymentDate(java.time.LocalDate.now());
-        } else if ("REJECTED".equals(paymentStatus) || "PAYMENT_REJECTED".equals(paymentStatus)) {
-            // 支付被拒绝
-            log.info("Payment rejected, setting status to REJECTED");
-            claimCase.setStatus(ClaimStatus.REJECTED);
-        }
+        // 中间状态不需要更新主状态，保持为PAYMENT_PROCESSING
+        log.debug("Payment status: {} (intermediate state, main status unchanged)", paymentStatus);
     }
 }

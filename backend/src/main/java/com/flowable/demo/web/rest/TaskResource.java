@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.flowable.cmmn.api.CmmnTaskService;
 import org.flowable.engine.HistoryService;
+import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
 import org.flowable.task.api.history.HistoricTaskInstance;
@@ -39,6 +40,7 @@ public class TaskResource {
 
     private final CmmnTaskService cmmnTaskService;
     private final TaskService taskService;
+    private final RuntimeService runtimeService;
     private final HistoryService historyService;
     private final ClaimCaseRepository claimCaseRepository;
     private final UserRepository userRepository;
@@ -66,22 +68,50 @@ public class TaskResource {
             log.debug("userId is a username, using it directly: {}", userId);
         }
         
-        List<Task> tasks = cmmnTaskService.createTaskQuery()
+        // Get tasks from both CMMN and BPMN engines
+        List<Task> cmmnTasks = cmmnTaskService.createTaskQuery()
                 .taskAssignee(flowableUserId)
                 .orderByTaskCreateTime().desc()
-                .listPage((int) pageable.getOffset(), pageable.getPageSize());
+                .list();
         
-        long total = cmmnTaskService.createTaskQuery()
+        List<Task> bpmnTasks = taskService.createTaskQuery()
                 .taskAssignee(flowableUserId)
-                .count();
+                .orderByTaskCreateTime().desc()
+                .list();
+        
+        // Merge both lists and remove duplicates
+        Set<String> taskIds = new HashSet<>();
+        List<Task> allTasks = new ArrayList<>();
+        
+        for (Task task : cmmnTasks) {
+            if (taskIds.add(task.getId())) {
+                allTasks.add(task);
+            }
+        }
+        
+        for (Task task : bpmnTasks) {
+            if (taskIds.add(task.getId())) {
+                allTasks.add(task);
+            }
+        }
+        
+        // Sort by creation time
+        allTasks.sort((t1, t2) -> t2.getCreateTime().compareTo(t1.getCreateTime()));
+        
+        // Apply pagination
+        long total = allTasks.size();
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), allTasks.size());
+        List<Task> pagedTasks = start < allTasks.size() ? allTasks.subList(start, end) : new ArrayList<>();
         
         Page<TaskDTO> result = new PageImpl<>(
-                tasks.stream().map(this::convertToDTO).collect(Collectors.toList()),
+                pagedTasks.stream().map(this::convertToDTO).collect(Collectors.toList()),
                 pageable,
                 total
         );
         
-        log.debug("Returning {} tasks for user {} (Flowable userId: {})", tasks.size(), userId, flowableUserId);
+        log.debug("Returning {} tasks for user {} (Flowable userId: {}, total: {})", 
+                pagedTasks.size(), userId, flowableUserId, total);
         return ResponseEntity.ok(result);
     }
 
@@ -112,11 +142,18 @@ public class TaskResource {
                     .orElseThrow(() -> new IllegalArgumentException("User not found"));
         }
         
-        // Get all tasks with candidate users directly
-        List<Task> tasksByCandidateUser = cmmnTaskService.createTaskQuery()
-                .taskCandidateUser(userId)
+        String username = user.getUsername();
+        
+        // Get all tasks with candidate users directly from both CMMN and BPMN
+        List<Task> tasksByCandidateUser = new ArrayList<>();
+        tasksByCandidateUser.addAll(cmmnTaskService.createTaskQuery()
+                .taskCandidateUser(username)
                 .active()
-                .list();
+                .list());
+        tasksByCandidateUser.addAll(taskService.createTaskQuery()
+                .taskCandidateUser(username)
+                .active()
+                .list());
         
         // Get all tasks with candidate groups that the user's roles match
         List<Task> tasksByCandidateGroups = new ArrayList<>();
@@ -125,13 +162,17 @@ public class TaskResource {
         for (Role role : user.getRoles()) {
             String flowableGroup = mapRoleToGroup(role.getName());
             if (flowableGroup != null) {
-                List<Task> groupTasks = cmmnTaskService.createTaskQuery()
+                // Query both CMMN and BPMN engines
+                tasksByCandidateGroups.addAll(cmmnTaskService.createTaskQuery()
                         .taskCandidateGroup(flowableGroup)
                         .active()
-                        .list();
-                tasksByCandidateGroups.addAll(groupTasks);
+                        .list());
+                tasksByCandidateGroups.addAll(taskService.createTaskQuery()
+                        .taskCandidateGroup(flowableGroup)
+                        .active()
+                        .list());
                 log.debug("Found {} tasks for user {} with role {} (group: {})", 
-                        groupTasks.size(), userId, role.getName(), flowableGroup);
+                        tasksByCandidateGroups.size(), userId, role.getName(), flowableGroup);
             }
         }
         
@@ -306,6 +347,13 @@ public class TaskResource {
                         log.debug("Set disputeResolution to: {}", variables.get("disputeResolution"));
                     }
                 }
+                
+                // Check if it's a payment rejected task - set paymentStatus to "rejected"
+                if ("userTask_paymentRejected".equals(taskKey)) {
+                    log.debug("Completing payment rejected task - setting paymentStatus to 'rejected'");
+                    variables.put("paymentStatus", "rejected");
+                    log.debug("Set paymentStatus to: {}", variables.get("paymentStatus"));
+                }
             }
             
             log.debug("Completing task {} with variables: {}", taskId, variables);
@@ -445,14 +493,21 @@ public class TaskResource {
                 log.debug("userId is a username, using it directly: {}", userId);
             }
             
-            // 我的待办任务数
+            // 我的待办任务数 - include both CMMN and BPMN
             long myTasksCount = cmmnTaskService.createTaskQuery()
+                    .taskAssignee(flowableUserId)
+                    .count()
+                    + taskService.createTaskQuery()
                     .taskAssignee(flowableUserId)
                     .count();
             statistics.put("myTasksCount", myTasksCount);
             
-            // 可认领任务数
+            // 可认领任务数 - include both CMMN and BPMN
             long claimableTasksCount = cmmnTaskService.createTaskQuery()
+                    .taskCandidateUser(flowableUserId)
+                    .active()
+                    .count()
+                    + taskService.createTaskQuery()
                     .taskCandidateUser(flowableUserId)
                     .active()
                     .count();
@@ -471,8 +526,11 @@ public class TaskResource {
                     userId, myTasksCount, claimableTasksCount, todayCompletedCount);
         }
         
-        // 总待办任务数
+        // 总待办任务数 - include both CMMN and BPMN
         long totalActiveTasks = cmmnTaskService.createTaskQuery()
+                .active()
+                .count()
+                + taskService.createTaskQuery()
                 .active()
                 .count();
         statistics.put("totalActiveTasks", totalActiveTasks);
@@ -490,29 +548,104 @@ public class TaskResource {
             @Parameter(description = "用户ID") @RequestParam(required = false) String userId) {
         log.debug("REST request to get tasks for case instance: {}", caseInstanceId);
         
-        // 获取待办任务
-        List<Task> activeTasks = cmmnTaskService.createTaskQuery()
+        // Get CMMN active tasks
+        List<Task> cmmnActiveTasks = cmmnTaskService.createTaskQuery()
                 .scopeId(caseInstanceId)
                 .active()
                 .orderByTaskCreateTime()
                 .asc()
                 .list();
         
-        // 获取历史任务
-        List<HistoricTaskInstance> historicTasks = historyService.createHistoricTaskInstanceQuery()
+        // Get BPMN active tasks - first find process instances with the caseInstanceId variable
+        List<org.flowable.engine.runtime.ProcessInstance> bpmnProcessInstances = runtimeService
+                .createProcessInstanceQuery()
+                .variableValueEquals("caseInstanceId", caseInstanceId)
+                .list();
+        
+        log.debug("Found {} BPMN process instances for case {}", bpmnProcessInstances.size(), caseInstanceId);
+        
+        List<Task> bpmnActiveTasks = new ArrayList<>();
+        for (org.flowable.engine.runtime.ProcessInstance processInstance : bpmnProcessInstances) {
+            List<Task> tasks = taskService.createTaskQuery()
+                    .processInstanceId(processInstance.getId())
+                    .active()
+                    .list();
+            bpmnActiveTasks.addAll(tasks);
+            log.debug("Process instance {} has {} active tasks", processInstance.getId(), tasks.size());
+        }
+        
+        // Merge active tasks
+        Set<String> taskIds = new HashSet<>();
+        List<Task> allActiveTasks = new ArrayList<>();
+        
+        for (Task task : cmmnActiveTasks) {
+            if (taskIds.add(task.getId())) {
+                allActiveTasks.add(task);
+            }
+        }
+        
+        for (Task task : bpmnActiveTasks) {
+            if (taskIds.add(task.getId())) {
+                allActiveTasks.add(task);
+            }
+        }
+        
+        log.debug("Found {} active tasks for case {} (CMMN: {}, BPMN: {})", 
+                allActiveTasks.size(), caseInstanceId, cmmnActiveTasks.size(), bpmnActiveTasks.size());
+        
+        // 获取历史任务 - combine CMMN and BPMN historic tasks
+        List<HistoricTaskInstance> cmmnHistoricTasks = historyService.createHistoricTaskInstanceQuery()
                 .scopeId(caseInstanceId)
                 .finished()
                 .orderByHistoricTaskInstanceEndTime()
                 .desc()
                 .list();
         
+        // Get historic BPMN tasks - find process instances first
+        List<org.flowable.engine.runtime.ProcessInstance> bpmnHistoricProcessInstances = runtimeService
+                .createProcessInstanceQuery()
+                .variableValueEquals("caseInstanceId", caseInstanceId)
+                .includeProcessVariables()
+                .list();
+        
+        Set<String> historicProcessInstanceIds = bpmnHistoricProcessInstances.stream()
+                .map(org.flowable.engine.runtime.ProcessInstance::getId)
+                .collect(Collectors.toSet());
+        
+        List<HistoricTaskInstance> bpmnHistoricTasks = new ArrayList<>();
+        for (String processInstanceId : historicProcessInstanceIds) {
+            List<HistoricTaskInstance> tasks = historyService.createHistoricTaskInstanceQuery()
+                    .processInstanceId(processInstanceId)
+                    .finished()
+                    .orderByHistoricTaskInstanceEndTime()
+                    .desc()
+                    .list();
+            bpmnHistoricTasks.addAll(tasks);
+        }
+        
+        // Merge historic tasks
+        Set<String> historicTaskIds = new HashSet<>();
+        List<HistoricTaskInstance> allHistoricTasks = new ArrayList<>();
+        
+        for (HistoricTaskInstance task : cmmnHistoricTasks) {
+            if (historicTaskIds.add(task.getId())) {
+                allHistoricTasks.add(task);
+            }
+        }
+        
+        for (HistoricTaskInstance task : bpmnHistoricTasks) {
+            if (historicTaskIds.add(task.getId())) {
+                allHistoricTasks.add(task);
+            }
+        }
+        
         Map<String, Object> result = new HashMap<>();
-        result.put("activeTasks", activeTasks.stream().map(this::convertToDTO).collect(Collectors.toList()));
-        result.put("historicTasks", historicTasks.stream().map(this::convertToHistoricDTO).collect(Collectors.toList()));
+        result.put("activeTasks", allActiveTasks.stream().map(this::convertToDTO).collect(Collectors.toList()));
+        result.put("historicTasks", allHistoricTasks.stream().map(this::convertToHistoricDTO).collect(Collectors.toList()));
         
         // 如果提供了用户ID，过滤并标记当前用户可以执行的任务
         if (userId != null) {
-            List<Task> availableForMeRaw = activeTasks.stream()
+            List<Task> availableForMeRaw = allActiveTasks.stream()
                     .filter(task -> isTaskAvailableForUser(task, userId))
                     .collect(Collectors.toList());
             result.put("availableForMe", availableForMeRaw.stream()

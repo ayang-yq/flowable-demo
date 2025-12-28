@@ -1,9 +1,11 @@
 package com.flowable.demo.service;
 
 import com.flowable.demo.domain.model.ClaimCase.ClaimStatus;
+import com.flowable.demo.domain.model.ClaimCase.PaymentStatus;
 import com.flowable.demo.domain.repository.ClaimCaseRepository;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.flowable.cmmn.api.CmmnRuntimeService;
 import org.flowable.cmmn.api.delegate.DelegatePlanItemInstance;
 import org.flowable.common.engine.api.delegate.Expression;
 import org.springframework.stereotype.Component;
@@ -19,14 +21,16 @@ import java.util.Optional;
 public class ClaimStateListener implements org.flowable.cmmn.api.listener.PlanItemInstanceLifecycleListener  {
 
     private final ClaimCaseRepository claimCaseRepository;
+    private final CmmnRuntimeService cmmnRuntimeService;
 
     // 通过field注入设置的claim状态
     @Setter
     private Expression status;
 
-    // 构造函数注入ClaimCaseRepository
-    public ClaimStateListener(ClaimCaseRepository claimCaseRepository) {
+    // 构造函数注入ClaimCaseRepository和CmmnRuntimeService
+    public ClaimStateListener(ClaimCaseRepository claimCaseRepository, CmmnRuntimeService cmmnRuntimeService) {
         this.claimCaseRepository = claimCaseRepository;
+        this.cmmnRuntimeService = cmmnRuntimeService;
     }
 
     @Override
@@ -116,10 +120,41 @@ public class ClaimStateListener implements org.flowable.cmmn.api.listener.PlanIt
                 claimCase.getId(), oldStatus, newStatus, source, matchMethod);
         
         claimCase.setStatus(newStatus);
+        
+        // 当状态转换为PAYMENT_PROCESSING时，初始化支付状态为PROCESSING
+        if (newStatus == ClaimStatus.PAYMENT_PROCESSING) {
+            log.info("Initializing payment status to PROCESSING for case {}", claimCase.getId());
+            claimCase.setPaymentStatus(PaymentStatus.PROCESSING);
+        }
+        
+        // 当状态更新为CLOSED时，终止 Case 实例
+        if (newStatus == ClaimStatus.CLOSED) {
+            log.info("Status changed to CLOSED, terminating case instance: {}", claimCase.getCaseInstanceId());
+            terminateCaseInstance(claimCase.getCaseInstanceId());
+        }
+        
         claimCaseRepository.save(claimCase);
         
-        log.info("Claim case {} status updated successfully to: {} (found via {})", 
-                claimCase.getId(), claimCase.getStatus(), matchMethod);
+        log.info("Claim case {} status updated successfully to: {}, payment status: {} (found via {})", 
+                claimCase.getId(), claimCase.getStatus(), claimCase.getPaymentStatus(), matchMethod);
+    }
+    
+    /**
+     * 终止 Case 实例
+     */
+    private void terminateCaseInstance(String caseInstanceId) {
+        if (caseInstanceId == null || caseInstanceId.isEmpty()) {
+            log.warn("Case instance ID is null or empty, cannot terminate case");
+            return;
+        }
+        
+        try {
+            log.info("Terminating case instance: {}", caseInstanceId);
+            cmmnRuntimeService.terminateCaseInstance(caseInstanceId);
+            log.info("Case instance {} terminated successfully", caseInstanceId);
+        } catch (Exception e) {
+            log.error("Error terminating case instance: {}", caseInstanceId, e);
+        }
     }
 
     @Override

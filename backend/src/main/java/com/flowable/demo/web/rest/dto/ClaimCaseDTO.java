@@ -49,6 +49,19 @@ public class ClaimCaseDTO {
     @Schema(description = "批准金额")
     private Double approvedAmount;
 
+    @Schema(description = "支付状态")
+    private String paymentStatus;
+
+    @Schema(description = "交易ID")
+    private String transactionId;
+
+    @Schema(description = "已支付金额")
+    private Double paidAmount;
+
+    @Schema(description = "支付日期")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private String paymentDate;
+
     @Schema(description = "理赔类型")
     private String claimType;
     
@@ -187,6 +200,38 @@ public class ClaimCaseDTO {
 
     public void setApprovedAmount(Double approvedAmount) {
         this.approvedAmount = approvedAmount;
+    }
+
+    public String getPaymentStatus() {
+        return paymentStatus;
+    }
+
+    public void setPaymentStatus(String paymentStatus) {
+        this.paymentStatus = paymentStatus;
+    }
+
+    public String getTransactionId() {
+        return transactionId;
+    }
+
+    public void setTransactionId(String transactionId) {
+        this.transactionId = transactionId;
+    }
+
+    public Double getPaidAmount() {
+        return paidAmount;
+    }
+
+    public void setPaidAmount(Double paidAmount) {
+        this.paidAmount = paidAmount;
+    }
+
+    public String getPaymentDate() {
+        return paymentDate;
+    }
+
+    public void setPaymentDate(String paymentDate) {
+        this.paymentDate = paymentDate;
     }
 
     public String getClaimType() {

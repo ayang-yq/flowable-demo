@@ -92,6 +92,10 @@ public class ClaimCase {
     @Column(name = "status", nullable = false, length = 20)
     private ClaimStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", length = 30)
+    private PaymentStatus paymentStatus;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assigned_to")
     private User assignedTo;
@@ -110,9 +114,6 @@ public class ClaimCase {
 
     @Column(name = "case_instance_id", length = 64)
     private String caseInstanceId;
-
-    @Column(name = "payment_status", length = 50)
-    private String paymentStatus;
 
     @Column(name = "transaction_id", length = 100)
     private String transactionId;
@@ -161,6 +162,26 @@ public class ClaimCase {
         private final String description;
 
         Severity(String description) {
+            this.description = description;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+    }
+
+    // 支付状态枚举
+    public enum PaymentStatus {
+        NOT_STARTED("未开始"),
+        PROCESSING("处理中"),
+        PAID("支付成功"),
+        PAYMENT_REJECTED("支付被拒绝"),
+        PAYMENT_FAILED("支付失败"),
+        DISPUTED("争议中");
+
+        private final String description;
+
+        PaymentStatus(String description) {
             this.description = description;
         }
 

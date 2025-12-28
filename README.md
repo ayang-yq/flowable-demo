@@ -744,7 +744,7 @@ caseService.startPaymentProcess(claimId);
 - `POST /api/cases/{id}/approve` - 批准理赔案件
 - `POST /api/cases/{id}/reject` - 拒绝理赔案件
 - `POST /api/cases/{id}/pay` - 支付理赔案件
-- `POST /api/cases/{id}/complete-review` - 完成审核任务（推动CMMN流程）
+- `POST /api/cases/{id}/close` - 关闭理赔案件（更新状态为CLOSED，终止Case实例）
 - `GET /api/cases/by-status` - 根据状态查询案件
 - `GET /api/cases/by-assignee` - 根据分配用户查询案件
 - `GET /api/cases/by-policy/{policyId}` - 根据保单查询案件
@@ -1230,6 +1230,66 @@ import { CmmnCaseVisualizer } from './CmmnCaseVisualizer';
    - 自动部署 CMMN、BPMN、DMN 定义
 
 ## 🔧 故障排除
+
+### BPMN 支付任务不显示问题
+
+**问题描述：**
+理赔详情页无法显示 BPMN 支付流程中的任务（如"支付校验"、"支付确认"等），导致用户无法完成支付流程。
+
+**问题根因：**
+1. `/api/tasks/by-case/{caseInstanceId}` 端点只查询 CMMN 任务
+2. BPMN 子流程任务与 CMMN Case 通过 `caseInstanceId` 变量关联
+3. 未正确合并 CMMN 和 BPMN 的任务列表
+
+**解决方案：**
+在 `TaskResource.getTasksByCase()` 中实现：
+1. 查询 CMMN 活跃任务：通过 `scopeId(caseInstanceId)` 查询
+2. 查询 BPMN 活跃任务：
+   - 先通过 `runtimeService.createProcessInstanceQuery().variableValueEquals("caseInstanceId", caseInstanceId)` 找到关联的 BPMN 流程实例
+   - 再通过流程实例 ID 查询其活跃任务
+3. 合并两个任务列表，使用 `Set` 去重
+4. 对历史任务采用相同逻辑
+
+**关键代码：**
+
+```java
+// 获取 BPMN 活跃任务
+List<ProcessInstance> bpmnProcessInstances = runtimeService
+    .createProcessInstanceQuery()
+    .variableValueEquals("caseInstanceId", caseInstanceId)
+    .list();
+
+List<Task> bpmnActiveTasks = new ArrayList<>();
+for (ProcessInstance processInstance : bpmnProcessInstances) {
+    List<Task> tasks = taskService.createTaskQuery()
+        .processInstanceId(processInstance.getId())
+        .active()
+        .list();
+    bpmnActiveTasks.addAll(tasks);
+}
+
+// 合并任务并去重
+Set<String> taskIds = new HashSet<>();
+for (Task task : cmmnActiveTasks) {
+    if (taskIds.add(task.getId())) {
+        allActiveTasks.add(task);
+    }
+}
+for (Task task : bpmnActiveTasks) {
+    if (taskIds.add(task.getId())) {
+        allActiveTasks.add(task);
+    }
+}
+```
+
+**验证结果：**
+- ✅ CMMN 任务正常显示（如 "Review Claim Application"）
+- ✅ BPMN 任务正常显示（如 "支付校验"、"支付确认"）
+- ✅ 任务正确分配给 `admin` 用户
+- ✅ 日志显示：`Found 1 active tasks for case xxx (CMMN: 0, BPMN: 1)`
+
+**相关文件：**
+- `backend/src/main/java/com/flowable/demo/web/rest/TaskResource.java`
 
 ### 候选组任务不显示问题
 
