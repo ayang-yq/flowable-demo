@@ -1,6 +1,7 @@
 package com.flowable.demo.web.rest;
 
 import com.flowable.demo.domain.model.ClaimCase;
+import com.flowable.demo.domain.model.User;
 import com.flowable.demo.domain.repository.ClaimCaseRepository;
 import com.flowable.demo.domain.repository.InsurancePolicyRepository;
 import com.flowable.demo.domain.repository.UserRepository;
@@ -21,6 +22,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -67,6 +70,20 @@ public class CaseResource {
         // 验证保单是否存在
         if (!insurancePolicyRepository.existsById(UUID.fromString(claimCaseDTO.getPolicyId()))) {
             throw new IllegalArgumentException("Invalid policy ID");
+        }
+
+        // 如果前端没有传 createdById，使用当前登录用户
+        if (claimCaseDTO.getCreatedById() == null) {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null && authentication.isAuthenticated()) {
+                String username = authentication.getName();
+                User currentUser = userRepository.findByUsername(username)
+                        .orElseThrow(() -> new RuntimeException("Current user not found: " + username));
+                claimCaseDTO.setCreatedById(currentUser.getId().toString());
+                log.info("No createdBy provided in request, using current user: {}", username);
+            } else {
+                log.warn("No authenticated user found, createdBy will be null");
+            }
         }
 
         ClaimCase result = caseService.createClaimCase(claimCaseDTO);

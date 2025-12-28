@@ -76,6 +76,8 @@ public class SecurityConfig {
                 .requestMatchers("/swagger/**", "/api/swagger/**").permitAll()
                 // 允许 OpenAPI 路径
                 .requestMatchers("/api-docs/**", "/api/api-docs/**").permitAll()
+                // 允许 H2 Console 路径（开发环境）
+                .requestMatchers("/h2-console/**", "/api/h2-console/**").permitAll()
                 // 允许健康检查端点无需认证
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 // 允许获取当前用户信息的端点（用于登录验证）
@@ -90,7 +92,9 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .httpBasic(httpBasic -> {})
-            .formLogin(formLogin -> formLogin.disable());
+            .formLogin(formLogin -> formLogin.disable())
+            // 禁用 X-Frame-Options header 以允许 H2 Console 在 iframe 中显示
+            .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()));
 
         return http.build();
     }

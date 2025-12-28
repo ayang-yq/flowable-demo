@@ -333,25 +333,6 @@ graph TB
 - **priority**: 优先级（普通/重要/紧急）
 - **claimComplexity**: 案件复杂度（simple/complex）
 
-### 2. 设置数据库
-
-```bash
-# 连接到本地 PostgreSQL
-psql -U postgres
-
-# 创建所需的数据库
-CREATE DATABASE flowable_cline;
-CREATE DATABASE flowable_demo;
-
-# 验证数据库已创建
-\l
-```
-
-**注意**: 确保本地 PostgreSQL 服务正在运行，默认连接配置为：
-- 主机: localhost:5432
-- 用户名: flowable_cline
-- 密码: flowable_cline
-
 ### 3. 初始化数据库
 
 ```bash
@@ -412,8 +393,8 @@ npm start
 ## 🔧 技术栈
 
 ### 后端技术
-- **Spring Boot 3.2.x** - 应用框架
-- **Flowable 7.0.1** - 流程引擎
+- **Spring Boot 3.5.8** - 应用框架
+- **Flowable 7.2.0** - 流程引擎
 - **Spring Security** - 安全框架
 - **Spring Data JPA** - 数据访问
 - **PostgreSQL** - 关系数据库
