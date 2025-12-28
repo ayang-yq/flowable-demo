@@ -55,7 +55,8 @@ public class CaseService {
                     .orElse(null);
         }
 
-        // 创建理赔案件
+        // 1. 先创建并保存 ClaimCase（此时还没有 caseInstanceId，状态为 DRAFT）
+        // 状态会在 CMMN 监听器触发后自动改为 SUBMITTED
         ClaimCase claimCase = ClaimCase.builder()
                 .claimNumber(generateClaimNumber())
                 .policy(policy)
@@ -69,15 +70,25 @@ public class CaseService {
                 .claimType(dto.getClaimType())
                 .severity(dto.getSeverity() != null ? ClaimCase.Severity.valueOf(dto.getSeverity().toUpperCase())
                         : ClaimCase.Severity.LOW)
-                .status(ClaimCase.ClaimStatus.SUBMITTED)
+                .status(ClaimCase.ClaimStatus.DRAFT)
                 .createdBy(createdBy)
                 .build();
 
-        // 保存案件
+        // 保存到数据库
         claimCase = claimCaseRepository.save(claimCase);
+        log.info("Claim case saved with ID: {}", claimCase.getId());
 
-        // 启动 Case 流程
-        startCaseProcess(claimCase);
+        // 2. 启动 Case 流程，传入 claimCaseId
+        String caseInstanceId = startCaseProcessWithClaimCaseId(claimCase);
+        
+        if (caseInstanceId != null) {
+            // 3. 更新 ClaimCase 的 caseInstanceId
+            claimCase.setCaseInstanceId(caseInstanceId);
+            claimCaseRepository.save(claimCase);
+            log.info("Claim case {} updated with case instance ID: {}", claimCase.getId(), caseInstanceId);
+        } else {
+            log.warn("Failed to start case process for claim case {}", claimCase.getId());
+        }
 
         return claimCase;
     }
@@ -358,6 +369,99 @@ public class CaseService {
         statistics.put("averageProcessingTime", avgProcessingDays != null ? avgProcessingDays * 24 : 0.0);
 
         return statistics;
+    }
+
+    /**
+     * 启动 Case 流程（接收已保存的 ClaimCase）
+     * 通过 claimCaseId 变量传递给流程，监听器可以通过 claimCaseId 查找
+     */
+    private String startCaseProcessWithClaimCaseId(ClaimCase claimCase) {
+        try {
+            Map<String, Object> variables = new HashMap<>();
+            // 传入 claimCaseId，监听器可以通过它查找 ClaimCase
+            variables.put("claimCaseId", claimCase.getId().toString());
+            variables.put("claimNumber", claimCase.getClaimNumber());
+            variables.put("policyId", claimCase.getPolicy().getId().toString());
+            variables.put("claimedAmount", claimCase.getClaimedAmount());
+            variables.put("coverageAmount", claimCase.getPolicy().getCoverageAmount());
+            variables.put("claimType", claimCase.getClaimType());
+            variables.put("severity", claimCase.getSeverity().toString());
+            variables.put("claimantName", claimCase.getClaimantName());
+            variables.put("incidentDate", claimCase.getIncidentDate().toString());
+            variables.put("incidentLocation", claimCase.getIncidentLocation());
+            variables.put("incidentDescription", claimCase.getIncidentDescription());
+            
+            // Set claimAdjuster - use creator's username or a default adjuster
+            if (claimCase.getCreatedBy() != null) {
+                variables.put("claimAdjuster", claimCase.getCreatedBy().getUsername());
+            } else {
+                // Default claim adjuster if no creator is specified
+                variables.put("claimAdjuster", "admin");
+            }
+            
+            // Set other required role variables with default values
+            variables.put("damageAssessor", "admin");
+            variables.put("approverGroup", "managers");
+            variables.put("paymentOfficer", "admin");
+            variables.put("paymentManager", "admin");
+            
+            // Initialize the DMN output variable to null so it becomes Global
+            variables.put("claimComplexity", null);
+            // Initialize Approval decision
+            variables.put("approved", null);
+            // Initialize Payment status
+            variables.put("paymentStatus", null);
+
+            org.flowable.cmmn.api.runtime.CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder()
+                    .caseDefinitionKey("insuranceClaimCase")
+                    .businessKey(claimCase.getClaimNumber())
+                    .name("理赔案件 - " + claimCase.getClaimNumber())
+                    .variables(variables)
+                    .start();
+
+            String caseInstanceId = caseInstance.getId();
+            log.info("Started case process for claim case {} with instance ID: {}", claimCase.getId(), caseInstanceId);
+
+            return caseInstanceId;
+
+        } catch (Exception e) {
+            log.error("Failed to start case process: {}", e.getMessage(), e);
+            return null;
+        }
+    }
+
+    /**
+     * 更新 Case 流程变量（在 ClaimCase 保存后调用）
+     */
+    private void updateCaseProcessVariables(ClaimCase claimCase) {
+        if (claimCase.getCaseInstanceId() == null) {
+            return;
+        }
+        
+        try {
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("claimCaseId", claimCase.getId().toString());
+            variables.put("claimNumber", claimCase.getClaimNumber());
+            variables.put("policyId", claimCase.getPolicy().getId().toString());
+            variables.put("claimedAmount", claimCase.getClaimedAmount());
+            variables.put("coverageAmount", claimCase.getPolicy().getCoverageAmount());
+            variables.put("claimType", claimCase.getClaimType());
+            variables.put("severity", claimCase.getSeverity().toString());
+            variables.put("claimantName", claimCase.getClaimantName());
+            variables.put("incidentDate", claimCase.getIncidentDate().toString());
+            variables.put("incidentLocation", claimCase.getIncidentLocation());
+            variables.put("incidentDescription", claimCase.getIncidentDescription());
+            
+            // Set all variables
+            cmmnRuntimeService.setVariables(claimCase.getCaseInstanceId(), variables);
+            
+            log.info("Updated case process variables for claim case {} with instance ID {}",
+                    claimCase.getId(), claimCase.getCaseInstanceId());
+
+        } catch (Exception e) {
+            log.warn("Failed to update case process variables for claim case {}: {}",
+                    claimCase.getId(), e.getMessage());
+        }
     }
 
     /**

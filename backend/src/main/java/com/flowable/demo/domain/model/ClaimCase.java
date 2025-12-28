@@ -117,6 +117,12 @@ public class ClaimCase {
     @Column(name = "transaction_id", length = 100)
     private String transactionId;
 
+    @Column(name = "paid_amount", precision = 19, scale = 2)
+    private BigDecimal paidAmount;
+
+    @Column(name = "payment_date")
+    private LocalDate paymentDate;
+
     @Builder.Default
     @OneToMany(mappedBy = "claim", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Set<ClaimHistory> history = new HashSet<>();

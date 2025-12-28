@@ -25,6 +25,11 @@ public class NotificationService implements JavaDelegate {
                 notificationType, claimId, paymentStatus);
         
         // 模拟发送通知
+        if (notificationType == null) {
+            log.warn("Notification type is null, skipping notification");
+            return;
+        }
+        
         switch (notificationType) {
             case "payment_completed":
                 sendPaymentCompletedNotification(claimId, paymentStatus);

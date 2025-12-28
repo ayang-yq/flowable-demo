@@ -18,7 +18,6 @@ import Dashboard from './components/Dashboard';
 import ClaimList from './components/ClaimList';
 import ClaimDetail from './components/ClaimDetail';
 import ClaimForm from './components/ClaimForm';
-import TaskList from './components/TaskList';
 import UserManagement from './components/UserManagement';
 import AdminDashboard from './components/admin/AdminDashboard';
 import CaseInstanceList from './components/admin/CaseInstanceList';
@@ -46,11 +45,6 @@ const AppContent: React.FC = () => {
       key: '/claims',
       icon: <FileSearchOutlined />,
       label: '理赔管理',
-    },
-    {
-      key: '/tasks',
-      icon: <UnorderedListOutlined />,
-      label: '任务中心',
     },
     {
       key: '/users',
@@ -156,7 +150,6 @@ const AppContent: React.FC = () => {
               <Route path="/claims/new" element={<ClaimForm />} />
               <Route path="/claims/:id" element={<ClaimDetail />} />
               <Route path="/claims/:id/edit" element={<ClaimForm />} />
-              <Route path="/tasks" element={<TaskList />} />
               <Route path="/users" element={<UserManagement />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/models" element={<ModelList />} />

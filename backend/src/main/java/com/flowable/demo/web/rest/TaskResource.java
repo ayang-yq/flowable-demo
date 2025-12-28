@@ -49,17 +49,30 @@ public class TaskResource {
     @GetMapping("/my-tasks")
     @Operation(summary = "获取我的待办任务", description = "获取当前用户的待办任务列表")
     public ResponseEntity<Page<TaskDTO>> getMyTasks(
-            @Parameter(description = "用户ID") @RequestParam String userId,
+            @Parameter(description = "用户ID或用户名") @RequestParam String userId,
             Pageable pageable) {
         log.debug("REST request to get my tasks for user: {}", userId);
         
+        // Try to find user by UUID first, then use username for Flowable query
+        String flowableUserId = userId;
+        try {
+            User user = userRepository.findById(UUID.fromString(userId)).orElse(null);
+            if (user != null) {
+                flowableUserId = user.getUsername();
+                log.debug("Found user with UUID {}, using Flowable username: {}", userId, flowableUserId);
+            }
+        } catch (IllegalArgumentException e) {
+            // userId is already a username, use it directly
+            log.debug("userId is a username, using it directly: {}", userId);
+        }
+        
         List<Task> tasks = cmmnTaskService.createTaskQuery()
-                .taskAssignee(userId)
+                .taskAssignee(flowableUserId)
                 .orderByTaskCreateTime().desc()
                 .listPage((int) pageable.getOffset(), pageable.getPageSize());
         
         long total = cmmnTaskService.createTaskQuery()
-                .taskAssignee(userId)
+                .taskAssignee(flowableUserId)
                 .count();
         
         Page<TaskDTO> result = new PageImpl<>(
@@ -68,6 +81,7 @@ public class TaskResource {
                 total
         );
         
+        log.debug("Returning {} tasks for user {} (Flowable userId: {})", tasks.size(), userId, flowableUserId);
         return ResponseEntity.ok(result);
     }
 
@@ -412,21 +426,34 @@ public class TaskResource {
     @GetMapping("/statistics")
     @Operation(summary = "获取任务统计", description = "获取任务的统计信息")
     public ResponseEntity<Map<String, Object>> getTaskStatistics(
-            @Parameter(description = "用户ID") @RequestParam(required = false) String userId) {
+            @Parameter(description = "用户ID或用户名") @RequestParam(required = false) String userId) {
         log.debug("REST request to get task statistics for user: {}", userId);
         
         Map<String, Object> statistics = new HashMap<>();
         
         if (userId != null) {
+            // Try to find user by UUID first, then use username for Flowable query
+            String flowableUserId = userId;
+            try {
+                User user = userRepository.findById(UUID.fromString(userId)).orElse(null);
+                if (user != null) {
+                    flowableUserId = user.getUsername();
+                    log.debug("Found user with UUID {}, using Flowable username: {}", userId, flowableUserId);
+                }
+            } catch (IllegalArgumentException e) {
+                // userId is already a username, use it directly
+                log.debug("userId is a username, using it directly: {}", userId);
+            }
+            
             // 我的待办任务数
             long myTasksCount = cmmnTaskService.createTaskQuery()
-                    .taskAssignee(userId)
+                    .taskAssignee(flowableUserId)
                     .count();
             statistics.put("myTasksCount", myTasksCount);
             
             // 可认领任务数
             long claimableTasksCount = cmmnTaskService.createTaskQuery()
-                    .taskCandidateUser(userId)
+                    .taskCandidateUser(flowableUserId)
                     .active()
                     .count();
             statistics.put("claimableTasksCount", claimableTasksCount);
@@ -434,11 +461,14 @@ public class TaskResource {
             // 今日完成任务数
             Date todayStart = java.sql.Date.valueOf(java.time.LocalDate.now());
             long todayCompletedCount = historyService.createHistoricTaskInstanceQuery()
-                    .taskAssignee(userId)
+                    .taskAssignee(flowableUserId)
                     .finished()
                     .taskCompletedAfter(todayStart)
                     .count();
             statistics.put("todayCompletedCount", todayCompletedCount);
+            
+            log.debug("Task statistics for user {}: myTasks={}, claimable={}, todayCompleted={}", 
+                    userId, myTasksCount, claimableTasksCount, todayCompletedCount);
         }
         
         // 总待办任务数
@@ -448,6 +478,130 @@ public class TaskResource {
         statistics.put("totalActiveTasks", totalActiveTasks);
         
         return ResponseEntity.ok(statistics);
+    }
+
+    /**
+     * 获取特定理赔案件的任务
+     */
+    @GetMapping("/by-case/{caseInstanceId}")
+    @Operation(summary = "获取理赔案件任务", description = "获取指定理赔案件的所有任务")
+    public ResponseEntity<Map<String, Object>> getTasksByCase(
+            @Parameter(description = "案件实例ID") @PathVariable String caseInstanceId,
+            @Parameter(description = "用户ID") @RequestParam(required = false) String userId) {
+        log.debug("REST request to get tasks for case instance: {}", caseInstanceId);
+        
+        // 获取待办任务
+        List<Task> activeTasks = cmmnTaskService.createTaskQuery()
+                .scopeId(caseInstanceId)
+                .active()
+                .orderByTaskCreateTime()
+                .asc()
+                .list();
+        
+        // 获取历史任务
+        List<HistoricTaskInstance> historicTasks = historyService.createHistoricTaskInstanceQuery()
+                .scopeId(caseInstanceId)
+                .finished()
+                .orderByHistoricTaskInstanceEndTime()
+                .desc()
+                .list();
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("activeTasks", activeTasks.stream().map(this::convertToDTO).collect(Collectors.toList()));
+        result.put("historicTasks", historicTasks.stream().map(this::convertToHistoricDTO).collect(Collectors.toList()));
+        
+        // 如果提供了用户ID，过滤并标记当前用户可以执行的任务
+        if (userId != null) {
+            List<Task> availableForMeRaw = activeTasks.stream()
+                    .filter(task -> isTaskAvailableForUser(task, userId))
+                    .collect(Collectors.toList());
+            result.put("availableForMe", availableForMeRaw.stream()
+                    .map(this::convertToDTO)
+                    .collect(Collectors.toList()));
+        }
+        
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * 检查任务是否对指定用户可用（可执行）
+     */
+    private boolean isTaskAvailableForUser(Task task, String userId) {
+        // Convert userId (UUID) to username for comparison with Flowable task assignee
+        String username = userId;
+        try {
+            User user = userRepository.findById(UUID.fromString(userId)).orElse(null);
+            if (user != null) {
+                username = user.getUsername();
+                log.debug("Converted userId {} to username {}", userId, username);
+            }
+        } catch (IllegalArgumentException e) {
+            // userId is already a username, use it directly
+            log.debug("userId is a username, using it directly: {}", userId);
+        }
+        
+        // 任务已分配给该用户
+        if (username.equals(task.getAssignee())) {
+            log.debug("Task {} is assigned to user {} (username: {})", task.getId(), userId, username);
+            return true;
+        }
+        
+        // 任务是该用户的候选任务
+        List<org.flowable.identitylink.api.IdentityLink> identityLinks = 
+                cmmnTaskService.getIdentityLinksForTask(task.getId());
+        for (org.flowable.identitylink.api.IdentityLink link : identityLinks) {
+            if ("candidate".equals(link.getType())) {
+                if (username.equals(link.getUserId())) {
+                    return true;
+                }
+                if (link.getGroupId() != null) {
+                    // 检查用户是否属于该组
+                    try {
+                        User user = userRepository.findById(UUID.fromString(userId))
+                                .orElse(userRepository.findByUsername(userId).orElse(null));
+                        if (user != null) {
+                            for (Role role : user.getRoles()) {
+                                String flowableGroup = mapRoleToGroup(role.getName());
+                                if (flowableGroup != null && flowableGroup.equals(link.getGroupId())) {
+                                    return true;
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.debug("Error checking group membership for user {}: {}", userId, e.getMessage());
+                    }
+                }
+            }
+        }
+        
+        log.debug("Task {} is not available for user {} (username: {})", task.getId(), userId, username);
+        return false;
+    }
+
+    /**
+     * 转换历史任务为DTO
+     */
+    private TaskDTO convertToHistoricDTO(HistoricTaskInstance historicTask) {
+        TaskDTO dto = new TaskDTO();
+        dto.setId(historicTask.getId());
+        dto.setName(historicTask.getName());
+        dto.setDescription(historicTask.getDescription());
+        dto.setAssignee(historicTask.getAssignee());
+        dto.setOwner(historicTask.getOwner());
+        dto.setProcessInstanceId(historicTask.getProcessInstanceId());
+        dto.setCaseInstanceId(historicTask.getScopeId());
+        dto.setTaskDefinitionKey(historicTask.getTaskDefinitionKey());
+        dto.setFormKey(historicTask.getFormKey());
+        dto.setPriority(historicTask.getPriority());
+        
+        if (historicTask.getCreateTime() != null) {
+            dto.setCreateTime(convertToLocalDateTime(historicTask.getCreateTime()));
+        }
+        if (historicTask.getEndTime() != null) {
+            dto.setDueDate(convertToLocalDateTime(historicTask.getEndTime()));
+        }
+        
+        return dto;
     }
 
     /**

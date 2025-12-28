@@ -191,6 +191,15 @@ export const taskApi = {
   getStatistics: (userId?: string): Promise<AxiosResponse<TaskStatistics>> => {
     return api.get('/tasks/statistics', { params: { userId } });
   },
+
+  // 获取特定理赔案件的任务
+  getTasksByCase: (caseInstanceId: string, userId?: string): Promise<AxiosResponse<{
+    activeTasks: FlowableTask[];
+    historicTasks: FlowableTask[];
+    availableForMe?: FlowableTask[];
+  }>> => {
+    return api.get(`/tasks/by-case/${caseInstanceId}`, { params: { userId } });
+  },
 };
 
 // 用户 API

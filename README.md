@@ -541,6 +541,178 @@ public ClaimCase approveClaimCase(UUID caseId, String userId, ApproveRequestDTO 
 
 详细技术文档: `docs/claim-cmmn-integration-analysis.md`
 
+### Flow-Driven Status 自动状态管理 (NEW)
+
+系统实现了基于工作流事件的自动状态管理机制，替代了原有的手动状态更新方式。
+
+#### 实现概述
+
+**问题背景：**
+- 原系统需要用户手动修改状态字段
+- 容易出现状态与工作流不一致的情况
+- 缺少状态变更的审计跟踪
+
+**解决方案：**
+- 通过监听工作流事件自动更新状态
+- 状态始终反映实际的工作流状态
+- 每次状态变更都关联到具体的工作流活动
+
+#### 状态枚举
+
+```java
+public enum Status {
+    DRAFT,              // 初始状态 - 草稿
+    PENDING_REVIEW,     // 提交审核后
+    UNDER_REVIEW,       // 审核进行中
+    AWAITING_APPROVAL,  // 等待决策表评估
+    APPROVED,           // 已批准
+    PENDING_PAYMENT,    // 支付流程已启动
+    PROCESSING_PAYMENT, // 支付处理中
+    PAID,               // 支付完成
+    REJECTED,           // 已拒绝
+    CLOSED              // 案件已关闭
+}
+```
+
+#### 状态流转图
+
+```
+DRAFT
+  ↓ (提交理赔申请)
+PENDING_REVIEW
+  ↓ (分配审核员)
+UNDER_REVIEW
+  ↓ (提交决策)
+AWAITING_APPROVAL
+  ↓ (DMN 决策)
+  ├─→ APPROVED → PENDING_PAYMENT → PROCESSING_PAYMENT → PAID
+  └─→ REJECTED
+
+PAID → CLOSED (可选最终步骤)
+```
+
+#### 监听器服务
+
+系统通过以下监听器实现自动状态更新：
+
+| 监听器 | 监听事件 | 状态更新 | 说明 |
+|--------|---------|---------|------|
+| `PaymentUpdateService` | BPMN 流程状态变化 | PENDING_PAYMENT → PROCESSING_PAYMENT | 监控支付流程进度 |
+| `PaymentCompletionListener` | 支付任务完成 | PROCESSING_PAYMENT → PAID | 记录支付元数据 |
+| `PaymentFailureListener` | 支付失败 | 记录失败状态 | 支持重试机制 |
+
+#### 工作流集成
+
+**CMMN Case 阶段与状态映射：**
+
+| CMMN 阶段 | 触发事件 | 状态变更 |
+|-----------|---------|---------|
+| Case Started | 创建案件 | DRAFT |
+| Triage Stage | 提交审查 | PENDING_REVIEW |
+| Investigation Stage | 审核中 | UNDER_REVIEW |
+| Approval Stage | 提交决策 | AWAITING_APPROVAL |
+| DMN Decision | 批准 | APPROVED |
+| Payment Stage | 启动支付 | PENDING_PAYMENT |
+| BPMN Process | 支付中 | PROCESSING_PAYMENT |
+| Payment Complete | 支付成功 | PAID |
+
+**BPMN 流程与状态映射：**
+
+| BPMN 节点 | 状态 | 说明 |
+|-----------|------|------|
+| Process Start | PENDING_PAYMENT | 支付流程启动 |
+| Payment Validation | PENDING_PAYMENT | 支付校验中 |
+| Payment Execution | PROCESSING_PAYMENT | 执行支付 |
+| Payment Confirmation | PROCESSING_PAYMENT | 等待确认 |
+| Process Complete | PAID | 支付完成 |
+
+#### API 增强
+
+新增任务相关 API：
+
+```java
+// 获取可认领任务列表
+GET /api/tasks/claimable
+
+// 获取当前用户的任务
+GET /api/tasks/my-tasks?userId={userId}&page=0&size=10
+
+// 获取任务统计
+GET /api/tasks/statistics?userId={userId}
+```
+
+**任务统计包含：**
+- `claimableTasksCount` - 可认领任务数
+- `totalActiveTasks` - 活跃任务总数
+- `myTasksCount` - 我的任务数
+- `todayCompletedCount` - 今日完成任务数
+
+#### 前端更新
+
+**ClaimDetail 组件增强：**
+- 显示流程驱动的状态徽章
+- 根据状态显示可用操作
+- 集成任务处理功能
+- 显示状态历史记录
+
+**移除 TaskList 页面：**
+- 任务处理功能整合到详情页
+- 简化导航结构
+- 更直观的用户体验
+
+#### 关键优势
+
+1. **自动更新** - 状态根据工作流事件自动变更，无需手动干预
+2. **一致性** - 状态始终反映实际的工作流状态
+3. **可审计** - 每次状态变更都关联到具体的工作流活动
+4. **灵活性** - 易于添加新状态或修改流转规则
+5. **错误预防** - 防止手动状态操纵
+6. **实时跟踪** - 用户可精确了解案件所处阶段
+
+#### 使用示例
+
+**创建理赔案件：**
+```java
+// 状态自动设置为 DRAFT
+ClaimCase claim = caseService.createClaimCase(claimRequestDTO);
+```
+
+**提交审核：**
+```java
+// 状态自动更新为 PENDING_REVIEW
+caseService.submitForReview(claimId);
+```
+
+**支付流程启动：**
+```java
+// 状态自动更新为 PENDING_PAYMENT
+caseService.startPaymentProcess(claimId);
+```
+
+**支付完成：**
+```java
+// PaymentCompletionListener 监听到支付完成
+// 状态自动更新为 PAID
+// 记录支付金额、日期、交易ID
+```
+
+#### 实现文件
+
+**后端：**
+- `ClaimCase.java` - 状态枚举定义
+- `PaymentUpdateService.java` - 支付流程状态监听
+- `PaymentCompletionListener.java` - 支付完成监听器
+- `PaymentFailureListener.java` - 支付失败监听器
+- `CaseService.java` - 状态更新辅助方法
+- `TaskResource.java` - 任务相关 API
+
+**前端：**
+- `api.ts` - API 服务层更新
+- `ClaimDetail.tsx` - 详情页组件重构
+- `App.tsx` - 导航更新
+
+详细文档：`docs/flow-driven-status-implementation-summary.md`
+
 ### 角色定义
 
 - **ADMIN** - 系统管理员

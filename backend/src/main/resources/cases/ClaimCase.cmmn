@@ -11,6 +11,7 @@
         <cmmn:casePlanModel id="casePlanModel" name="Insurance Claim Plan Model">
 
             <cmmn:planItem id="planItemStageTriage" name="Triage" definitionRef="stageTriage" />
+
             <cmmn:planItem id="planItemStageInvestigation" name="Investigation" definitionRef="stageInvestigation">
                <cmmn:entryCriterion id="entrySentryInvestigation" sentryRef="sentryInvestigationEntry" />
             </cmmn:planItem>
@@ -24,6 +25,7 @@
             <cmmn:planItem id="planItemStagePayment" name="Payment" definitionRef="stagePayment">
                 <cmmn:entryCriterion id="entrySentryPayment" sentryRef="sentryPaymentEntry" />
             </cmmn:planItem>
+            
             <cmmn:planItem id="planItemStageClosure" name="Closure" definitionRef="stageClosure">
                 <cmmn:entryCriterion id="entrySentryClosure" sentryRef="sentryClosureEntry" />
             </cmmn:planItem>
@@ -72,7 +74,7 @@
                     <cmmn:condition><![CDATA[${approved == false}]]></cmmn:condition>
                 </cmmn:ifPart>
             </cmmn:sentry>
- 
+
             <cmmn:sentry id="sentryPaymentEntry">
                 <cmmn:planItemOnPart sourceRef="planItemTaskFinalApproval">
                     <cmmn:standardEvent>complete</cmmn:standardEvent>
@@ -94,7 +96,12 @@
                 </cmmn:planItemOnPart>
             </cmmn:sentry>
 
-            <cmmn:stage id="stageTriage" name="Triage">
+            <cmmn:stage id="stageTriage" name="Triage" flowable:async="true">
+                <cmmn:extensionElements>
+                    <flowable:planItemLifecycleListener sourceState="available" targetState="active" delegateExpression="${claimStateListener}">
+                        <flowable:field name="status" stringValue="SUBMITTED" />
+                    </flowable:planItemLifecycleListener>
+                </cmmn:extensionElements>
                 <cmmn:planItem id="planItemTaskReviewClaim" name="Review Claim Application" definitionRef="taskReviewClaim" />
                 <cmmn:planItem id="planItemTaskAssessComplexity" name="Assess Claim Complexity" definitionRef="taskAssessComplexity">
                      <cmmn:entryCriterion id="entrySentryAssessComplexity" sentryRef="sentryAssessComplexityEntry" />
@@ -102,6 +109,11 @@
             </cmmn:stage>
 
             <cmmn:stage id="stageInvestigation" name="Investigation">
+                <cmmn:extensionElements>
+                    <flowable:planItemLifecycleListener sourceState="available" targetState="active" delegateExpression="${claimStateListener}">
+                        <flowable:field name="status" stringValue="UNDER_REVIEW" />
+                    </flowable:planItemLifecycleListener>
+                </cmmn:extensionElements>
                 <cmmn:planItem id="planItemTaskGatherDocuments" name="Gather Missing Documents" definitionRef="taskGatherDocuments">
                     <cmmn:itemControl>
                         <cmmn:repetitionRule>
@@ -115,14 +127,28 @@
             </cmmn:stage>
 
             <cmmn:stage id="stageApproval" name="Approval">
+                <cmmn:extensionElements>
+                    <flowable:planItemLifecycleListener sourceState="available" targetState="active" delegateExpression="${claimStateListener}">
+                        <flowable:field name="status" stringValue="UNDER_REVIEW" />
+                    </flowable:planItemLifecycleListener>
+                </cmmn:extensionElements>
                 <cmmn:planItem id="planItemTaskFinalApproval" name="Final Claim Approval" definitionRef="taskFinalApproval" />
             </cmmn:stage>
 
             <cmmn:stage id="stagePayment" name="Payment">
+                <cmmn:extensionElements>
+                    <flowable:planItemLifecycleListener sourceState="available" targetState="active" delegateExpression="${claimStateListener}">
+                        <flowable:field name="status" stringValue="APPROVED" />
+                    </flowable:planItemLifecycleListener>
+                    <flowable:planItemLifecycleListener sourceState="available" targetState="active" delegateExpression="${paymentCompletionListener}" />
+                </cmmn:extensionElements>
                 <cmmn:planItem id="planItemTaskProcessPayment" name="Process Claim Payment" definitionRef="taskProcessPayment" />
             </cmmn:stage>
 
             <cmmn:stage id="stageClosure" name="Closure">
+                <cmmn:extensionElements>
+                    <flowable:planItemLifecycleListener sourceState="available" targetState="active" delegateExpression="${paymentCompletionListener}" />
+                </cmmn:extensionElements>
                 <cmmn:planItem id="planItemTaskNotifyCustomer" name="Notify Customer of Outcome" definitionRef="taskNotifyCustomer" />
                 <cmmn:planItem id="planItemMilestoneCaseClosed" name="Case Closed" definitionRef="milestoneCaseClosed">
                     <cmmn:entryCriterion id="entrySentryCaseClosed" sentryRef="sentryCaseClosedEntry" />
@@ -134,24 +160,30 @@
             <cmmn:humanTask id="taskGatherDocuments" name="Gather Missing Documents" flowable:assignee="${claimAdjuster}" />
             <cmmn:humanTask id="taskAssessDamage" name="Assess Damages" flowable:assignee="${damageAssessor}" />
             <cmmn:humanTask id="taskFinalApproval" name="Final Claim Approval" flowable:candidateGroups="${approverGroup}" />
+            
             <cmmn:processTask id="taskProcessPayment" name="Process Claim Payment">
                 <cmmn:extensionElements>
                     <flowable:in source="amount" target="amount" />
                     <flowable:in source="reference" target="reference" />
                     <flowable:in source="payeeName" target="payeeName" />
                     <flowable:in source="claimId" target="claimId" />
-
                     <flowable:in source="paymentOfficer" target="paymentOfficer" />
                     <flowable:in source="paymentManager" target="paymentManager" />
-
                     <flowable:in source="caseInstanceId" target="caseInstanceId" />
-                    
                     <flowable:out source="paymentStatus" target="paymentStatus" />
                 </cmmn:extensionElements>
                 <cmmn:processRefExpression><![CDATA[ClaimPaymentProcess]]></cmmn:processRefExpression>
             </cmmn:processTask>
+            
             <cmmn:humanTask id="taskNotifyCustomer" name="Notify Customer of Outcome" flowable:assignee="${claimAdjuster}" />
-            <cmmn:milestone id="milestoneCaseClosed" name="Case Closed" />
+            
+            <cmmn:milestone id="milestoneCaseClosed" name="Case Closed">
+                <cmmn:extensionElements>
+                    <flowable:planItemLifecycleListener sourceState="available" targetState="completed" delegateExpression="${claimStateListener}">
+                        <flowable:field name="status" stringValue="CLOSED" />
+                    </flowable:planItemLifecycleListener>
+                </cmmn:extensionElements>
+            </cmmn:milestone>
 
         </cmmn:casePlanModel>
     </cmmn:case>

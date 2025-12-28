@@ -20,10 +20,12 @@ import {
   UserOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { claimApi, taskApi } from '../services/api';
 import { ClaimCase, FlowableTask, DashboardStatistics, TaskStatistics } from '../types';
 
 const Dashboard: React.FC = () => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [statistics, setStatistics] = useState<DashboardStatistics | null>(null);
   const [taskStatistics, setTaskStatistics] = useState<TaskStatistics | null>(null);
@@ -32,19 +34,29 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (user) {
+      loadData();
+    }
+  }, [user]);
 
   const loadData = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
+      
+      // 使用当前登录用户的ID
+      const userId = user.id;
       
       // 并行加载数据
       const [statsRes, taskStatsRes, claimsRes, tasksRes] = await Promise.all([
         claimApi.getStatistics(),
-        taskApi.getStatistics('admin'), // 假设当前用户是 admin
+        taskApi.getStatistics(userId),
         claimApi.getClaims({ page: 0, size: 5, sort: 'createdAt', direction: 'DESC' }),
-        taskApi.getMyTasks('admin', { page: 0, size: 5 })
+        taskApi.getMyTasks(userId, { page: 0, size: 5 })
       ]);
 
       setStatistics(statsRes.data);
