@@ -67,7 +67,7 @@
       </extensionElements>
     </userTask>
 
-    <serviceTask id="serviceTask_updateCase" name="更新 Case 状态" flowable:delegateExpression="${caseService}">
+    <serviceTask id="serviceTask_updateCase" name="更新 Case 状态" flowable:delegateExpression="${paymentUpdateService}">
       <extensionElements>
         <flowable:field name="caseInstanceId">
           <flowable:expression>${caseInstanceId}</flowable:expression>

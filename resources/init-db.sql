@@ -107,23 +107,123 @@ CREATE INDEX IF NOT EXISTS idx_claim_case_created_at ON claim_case(created_at);
 CREATE INDEX IF NOT EXISTS idx_claim_document_claim_id ON claim_document(claim_id);
 CREATE INDEX IF NOT EXISTS idx_claim_history_claim_id ON claim_history(claim_id);
 
--- 插入默认角色
+-- Truncate Flowable tables first (before app tables due to foreign keys)
+-- Note: Only truncate tables that exist (Flowable 7.x may have changed schema)
+
+-- BPMN runtime tables (if they exist)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_ru_identitylink') THEN
+        EXECUTE 'TRUNCATE TABLE act_ru_identitylink CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_ru_variable') THEN
+        EXECUTE 'TRUNCATE TABLE act_ru_variable CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_ru_task') THEN
+        EXECUTE 'TRUNCATE TABLE act_ru_task CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_ru_execution') THEN
+        EXECUTE 'TRUNCATE TABLE act_ru_execution CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_ru_job') THEN
+        EXECUTE 'TRUNCATE TABLE act_ru_job CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_ru_timer_job') THEN
+        EXECUTE 'TRUNCATE TABLE act_ru_timer_job CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_ru_suspended_job') THEN
+        EXECUTE 'TRUNCATE TABLE act_ru_suspended_job CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_ru_deadletter_job') THEN
+        EXECUTE 'TRUNCATE TABLE act_ru_deadletter_job CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_ru_event_subscr') THEN
+        EXECUTE 'TRUNCATE TABLE act_ru_event_subscr CASCADE';
+    END IF;
+END $$;
+
+-- BPMN history tables (if they exist)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_hi_identitylink') THEN
+        EXECUTE 'TRUNCATE TABLE act_hi_identitylink CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_hi_varinst') THEN
+        EXECUTE 'TRUNCATE TABLE act_hi_varinst CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_hi_taskinst') THEN
+        EXECUTE 'TRUNCATE TABLE act_hi_taskinst CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_hi_actinst') THEN
+        EXECUTE 'TRUNCATE TABLE act_hi_actinst CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_hi_procinst') THEN
+        EXECUTE 'TRUNCATE TABLE act_hi_procinst CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_hi_detail') THEN
+        EXECUTE 'TRUNCATE TABLE act_hi_detail CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_hi_comment') THEN
+        EXECUTE 'TRUNCATE TABLE act_hi_comment CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_hi_attachment') THEN
+        EXECUTE 'TRUNCATE TABLE act_hi_attachment CASCADE';
+    END IF;
+END $$;
+
+-- CMMN tables (if they exist)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_hi_caseinst') THEN
+        EXECUTE 'TRUNCATE TABLE act_hi_caseinst CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_hi_mil_inst') THEN
+        EXECUTE 'TRUNCATE TABLE act_hi_mil_inst CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_ru_case_sentry_part') THEN
+        EXECUTE 'TRUNCATE TABLE act_ru_case_sentry_part CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_ru_mil_execution') THEN
+        EXECUTE 'TRUNCATE TABLE act_ru_mil_execution CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_ru_plan_item_instance') THEN
+        EXECUTE 'TRUNCATE TABLE act_ru_plan_item_instance CASCADE';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_ru_case_execution') THEN
+        EXECUTE 'TRUNCATE TABLE act_ru_case_execution CASCADE';
+    END IF;
+END $$;
+
+-- DMN tables (if they exist)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'act_dmn_hi_decision') THEN
+        EXECUTE 'TRUNCATE TABLE act_dmn_hi_decision CASCADE';
+    END IF;
+END $$;
+
+-- Truncate application tables
+TRUNCATE TABLE user_role, claim_history, claim_document, claim_case, insurance_policy, app_user, app_role CASCADE;
+
+-- Insert default roles
 INSERT INTO app_role (name, description) VALUES 
-('ADMIN', '系统管理员'),
-('CLAIM_HANDLER', '理赔处理员'),
-('CLAIM_AUDITOR', '理赔审核员'),
-('CLAIM_MANAGER', '理赔经理')
+('ADMIN', 'System Administrator'),
+('MANAGER', 'Manager'),
+('CLAIM_HANDLER', 'Claim Handler'),
+('APPROVER', 'Approver'),
+('FINANCE', 'Finance'),
+('USER', 'Regular User')
 ON CONFLICT (name) DO NOTHING;
 
--- 插入默认用户（密码为：password，使用 BCrypt 加密）
+-- Insert default users (password: admin for all users, BCrypt encrypted)
 INSERT INTO app_user (username, password, first_name, last_name, email, department) VALUES 
-('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', '系统', '管理员', 'admin@flowable-demo.com', 'IT'),
-('handler1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', '张', '三', 'handler1@flowable-demo.com', '理赔部'),
-('auditor1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', '李', '四', 'auditor1@flowable-demo.com', '审核部'),
-('manager1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', '王', '五', 'manager1@flowable-demo.com', '管理部')
+('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'System', 'Admin', 'admin@flowable-demo.com', 'IT'),
+('handler1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'Handler', 'One', 'handler1@flowable-demo.com', 'Claims'),
+('auditor1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'Auditor', 'One', 'auditor1@flowable-demo.com', 'Audit'),
+('manager1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'Manager', 'One', 'manager1@flowable-demo.com', 'Management')
 ON CONFLICT (username) DO NOTHING;
 
--- 分配角色
+-- Assign roles
 INSERT INTO user_role (user_id, role_id) 
 SELECT u.id, r.id FROM app_user u, app_role r 
 WHERE u.username = 'admin' AND r.name = 'ADMIN'
@@ -136,24 +236,24 @@ ON CONFLICT DO NOTHING;
 
 INSERT INTO user_role (user_id, role_id) 
 SELECT u.id, r.id FROM app_user u, app_role r 
-WHERE u.username = 'auditor1' AND r.name = 'CLAIM_AUDITOR'
+WHERE u.username = 'auditor1' AND r.name = 'APPROVER'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO user_role (user_id, role_id) 
 SELECT u.id, r.id FROM app_user u, app_role r 
-WHERE u.username = 'manager1' AND r.name = 'CLAIM_MANAGER'
+WHERE u.username = 'manager1' AND r.name = 'MANAGER'
 ON CONFLICT DO NOTHING;
 
--- 插入示例保单数据
+-- Insert sample policy data
 INSERT INTO insurance_policy (policy_number, policy_holder_name, policy_holder_phone, policy_holder_email, policy_type, coverage_amount, premium_amount, start_date, end_date) VALUES 
-('POL2024001', '张三', '13800138001', 'zhangsan@email.com', '车险', 200000.00, 3000.00, '2024-01-01', '2024-12-31'),
-('POL2024002', '李四', '13800138002', 'lisi@email.com', '财产险', 500000.00, 5000.00, '2024-01-01', '2024-12-31'),
-('POL2024003', '王五', '13800138003', 'wangwu@email.com', '人身险', 1000000.00, 8000.00, '2024-01-01', '2024-12-31'),
-('POL2024004', '赵六', '13800138004', 'zhaoliu@email.com', '车险', 150000.00, 2500.00, '2024-01-01', '2024-12-31'),
-('POL2024005', '钱七', '13800138005', 'qianqi@email.com', '财产险', 800000.00, 7000.00, '2024-01-01', '2024-12-31')
+('POL2024001', 'Zhang San', '13800138001', 'zhangsan@email.com', 'Car Insurance', 200000.00, 3000.00, '2024-01-01', '2024-12-31'),
+('POL2024002', 'Li Si', '13800138002', 'lisi@email.com', 'Property Insurance', 500000.00, 5000.00, '2024-01-01', '2024-12-31'),
+('POL2024003', 'Wang Wu', '13800138003', 'wangwu@email.com', 'Life Insurance', 1000000.00, 8000.00, '2024-01-01', '2024-12-31'),
+('POL2024004', 'Zhao Liu', '13800138004', 'zhaoliu@email.com', 'Car Insurance', 150000.00, 2500.00, '2024-01-01', '2024-12-31'),
+('POL2024005', 'Qian Qi', '13800138005', 'qianqi@email.com', 'Property Insurance', 800000.00, 7000.00, '2024-01-01', '2024-12-31')
 ON CONFLICT (policy_number) DO NOTHING;
 
--- 创建更新时间触发器函数
+-- Create update timestamp trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -162,9 +262,14 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- 为需要的表创建更新时间触发器
+-- Create update timestamp triggers for required tables
+DROP TRIGGER IF EXISTS update_app_user_updated_at ON app_user;
 CREATE TRIGGER update_app_user_updated_at BEFORE UPDATE ON app_user FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_insurance_policy_updated_at ON insurance_policy;
 CREATE TRIGGER update_insurance_policy_updated_at BEFORE UPDATE ON insurance_policy FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_claim_case_updated_at ON claim_case;
 CREATE TRIGGER update_claim_case_updated_at BEFORE UPDATE ON claim_case FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 COMMIT;

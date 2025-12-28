@@ -177,6 +177,11 @@ export const taskApi = {
     return api.get(`/tasks/${taskId}`);
   },
 
+  // 获取任务变量
+  getTaskVariables: (taskId: string): Promise<AxiosResponse<Record<string, any>>> => {
+    return api.get(`/tasks/${taskId}/variables`);
+  },
+
   // 获取历史任务
   getHistoricTasks: (userId: string, params?: PaginationParams): Promise<AxiosResponse<PageResult<any>>> => {
     return api.get('/tasks/history', { params: { userId, ...params } });

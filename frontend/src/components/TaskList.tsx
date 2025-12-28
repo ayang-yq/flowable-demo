@@ -8,18 +8,25 @@ import {
   Tag,
   Modal,
   message,
-  Popconfirm
+  Popconfirm,
+  Form,
+  Radio,
+  Input,
+  Descriptions,
+  Spin
 } from 'antd';
 import { 
   CheckOutlined, 
   UserOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  DollarOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { taskApi, userApi } from '../services/api';
 import { FlowableTask, User } from '../types';
 
 const { TabPane } = Tabs;
+const { TextArea } = Input;
 
 const TaskList: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -33,7 +40,17 @@ const TaskList: React.FC = () => {
   const [pageSize, setPageSize] = useState(10);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState<FlowableTask | null>(null);
-
+  
+  // 支付任务相关状态
+  const [validationModalVisible, setValidationModalVisible] = useState(false);
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [rejectedModalVisible, setRejectedModalVisible] = useState(false);
+  const [disputeModalVisible, setDisputeModalVisible] = useState(false);
+  const [taskVariables, setTaskVariables] = useState<Record<string, any>>({});
+  const [loadingVariables, setLoadingVariables] = useState(false);
+  const [selectedTaskForProcessing, setSelectedTaskForProcessing] = useState<FlowableTask | null>(null);
+  
+  const [form] = Form.useForm();
   const navigate = useNavigate();
 
   const loadMyTasks = useCallback(async () => {
@@ -85,6 +102,20 @@ const TaskList: React.FC = () => {
     loadUsers();
   }, [currentPage, pageSize, activeTab, loadMyTasks, loadClaimableTasks]);
 
+  const loadTaskVariables = async (taskId: string) => {
+    try {
+      setLoadingVariables(true);
+      const response = await taskApi.getTaskVariables(taskId);
+      setTaskVariables(response.data);
+      console.log('Task variables:', response.data);
+    } catch (error) {
+      console.error('Failed to load task variables:', error);
+      message.error('加载任务变量失败');
+    } finally {
+      setLoadingVariables(false);
+    }
+  };
+
   const handleClaimTask = async (taskId: string) => {
     try {
       await taskApi.claimTask(taskId, 'admin');
@@ -109,15 +140,53 @@ const TaskList: React.FC = () => {
     }
   };
 
-  const handleCompleteTask = async (taskId: string) => {
-    try {
-      await taskApi.completeTask(taskId);
-      message.success('完成任务成功');
-      loadMyTasks();
-      loadClaimableTasks();
-    } catch (error) {
-      console.error('Failed to complete task:', error);
-      message.error('完成任务失败');
+  const handleCompleteTask = async (taskId: string, task?: FlowableTask) => {
+    const taskToProcess = task || myTasks.find(t => t.id === taskId);
+    
+    if (!taskToProcess) {
+      message.error('任务不存在');
+      return;
+    }
+
+    // 根据任务类型处理
+    switch (taskToProcess.taskDefinitionKey) {
+      case 'userTask_validatePayment':
+        // 支付校验任务
+        setSelectedTaskForProcessing(taskToProcess);
+        await loadTaskVariables(taskId);
+        setValidationModalVisible(true);
+        break;
+      
+      case 'userTask_confirmPayment':
+        // 支付确认任务
+        setSelectedTaskForProcessing(taskToProcess);
+        await loadTaskVariables(taskId);
+        setConfirmModalVisible(true);
+        break;
+      
+      case 'userTask_paymentRejected':
+        // 支付被拒绝任务
+        setSelectedTaskForProcessing(taskToProcess);
+        setRejectedModalVisible(true);
+        break;
+      
+      case 'userTask_handleDispute':
+        // 处理支付争议任务
+        setSelectedTaskForProcessing(taskToProcess);
+        setDisputeModalVisible(true);
+        break;
+      
+      default:
+        // 普通任务，直接完成
+        try {
+          await taskApi.completeTask(taskId);
+          message.success('完成任务成功');
+          loadMyTasks();
+          loadClaimableTasks();
+        } catch (error) {
+          console.error('Failed to complete task:', error);
+          message.error('完成任务失败');
+        }
     }
   };
 
@@ -134,6 +203,90 @@ const TaskList: React.FC = () => {
     } catch (error) {
       console.error('Failed to assign task:', error);
       message.error('分配任务失败');
+    }
+  };
+
+  const handleValidatePayment = async (values: any) => {
+    try {
+      if (selectedTaskForProcessing) {
+        const variables = {
+          validationResult: values.validationResult,
+          validationComment: values.validationComment
+        };
+        
+        await taskApi.completeTask(selectedTaskForProcessing.id, variables);
+        message.success('支付校验成功');
+        setValidationModalVisible(false);
+        form.resetFields();
+        loadMyTasks();
+        loadClaimableTasks();
+      }
+    } catch (error) {
+      console.error('Failed to validate payment:', error);
+      message.error('支付校验失败');
+    }
+  };
+
+  const handleConfirmPayment = async (values: any) => {
+    try {
+      if (selectedTaskForProcessing) {
+        const variables = {
+          confirmationResult: values.confirmationResult,
+          confirmationComment: values.confirmationComment
+        };
+        
+        await taskApi.completeTask(selectedTaskForProcessing.id, variables);
+        message.success('支付确认成功');
+        setConfirmModalVisible(false);
+        form.resetFields();
+        loadMyTasks();
+        loadClaimableTasks();
+      }
+    } catch (error) {
+      console.error('Failed to confirm payment:', error);
+      message.error('支付确认失败');
+    }
+  };
+
+  const handleRejectedPayment = async (values: any) => {
+    try {
+      if (selectedTaskForProcessing) {
+        const variables = {
+          rejectionReason: values.rejectionReason,
+          rejectionComment: values.rejectionComment
+        };
+        
+        await taskApi.completeTask(selectedTaskForProcessing.id, variables);
+        message.success('处理支付拒绝成功');
+        setRejectedModalVisible(false);
+        form.resetFields();
+        loadMyTasks();
+        loadClaimableTasks();
+      }
+    } catch (error) {
+      console.error('Failed to handle rejected payment:', error);
+      message.error('处理支付拒绝失败');
+    }
+  };
+
+  const handleDisputePayment = async (values: any) => {
+    try {
+      if (selectedTaskForProcessing) {
+        const variables = {
+          disputeResolution: values.disputeResolution,
+          disputeComment: values.disputeComment
+        };
+        
+        await taskApi.completeTask(selectedTaskForProcessing.id, variables);
+        message.success('处理支付争议成功');
+        setDisputeModalVisible(false);
+        form.resetFields();
+        loadMyTasks();
+        loadClaimableTasks();
+      }
+    } catch (error) {
+      console.error('Failed to handle dispute:', error);
+      message.error('处理支付争议失败');
     }
   };
 
@@ -233,9 +386,9 @@ const TaskList: React.FC = () => {
                 type="primary"
                 size="small"
                 icon={<CheckOutlined />}
-                onClick={() => handleCompleteTask(record.id)}
+                onClick={() => handleCompleteTask(record.id, record)}
               >
-                完成
+                {record.taskDefinitionKey?.includes('Payment') ? '处理' : '完成'}
               </Button>
               <Button
                 size="small"
@@ -326,9 +479,9 @@ const TaskList: React.FC = () => {
           setSelectedTask(null);
         }}
         onOk={() => {
-          const form = document.querySelector('#assign-task-form') as HTMLFormElement;
-          if (form) {
-            form.requestSubmit();
+          const formEl = document.querySelector('#assign-task-form') as HTMLFormElement;
+          if (formEl) {
+            formEl.requestSubmit();
           }
         }}
       >
@@ -356,6 +509,207 @@ const TaskList: React.FC = () => {
             </select>
           </div>
         </form>
+      </Modal>
+
+      {/* 支付校验模态框 */}
+      <Modal
+        title={
+          <span>
+            <DollarOutlined /> 支付校验
+          </span>
+        }
+        visible={validationModalVisible}
+        onCancel={() => {
+          setValidationModalVisible(false);
+          form.resetFields();
+          setTaskVariables({});
+          setSelectedTaskForProcessing(null);
+        }}
+        onOk={() => {
+          form.validateFields()
+            .then((values) => {
+              handleValidatePayment(values);
+            })
+            .catch((error) => {
+              console.error('表单验证失败:', error);
+            });
+        }}
+        okText="提交"
+        cancelText="取消"
+        width={600}
+      >
+        <Spin spinning={loadingVariables}>
+          <Descriptions bordered column={1} style={{ marginBottom: 16 }}>
+            <Descriptions.Item label="支付金额">
+              ¥{(taskVariables.amount || 0).toLocaleString()}
+            </Descriptions.Item>
+            <Descriptions.Item label="支付参考号">
+              {taskVariables.reference || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="收款人姓名">
+              {taskVariables.payeeName || '-'}
+            </Descriptions.Item>
+          </Descriptions>
+
+          <Form form={form} onFinish={handleValidatePayment} layout="vertical">
+            <Form.Item 
+              name="validationResult" 
+              label="校验结果" 
+              rules={[{ required: true, message: '请选择校验结果' }]}
+            >
+              <Radio.Group>
+                <Radio value="approved">批准</Radio>
+                <Radio value="rejected">拒绝</Radio>
+              </Radio.Group>
+            </Form.Item>
+            <Form.Item name="validationComment" label="校验备注">
+              <TextArea rows={4} placeholder="请输入校验备注（可选）" />
+            </Form.Item>
+          </Form>
+        </Spin>
+      </Modal>
+
+      {/* 支付确认模态框 */}
+      <Modal
+        title={
+          <span>
+            <DollarOutlined /> 支付确认
+          </span>
+        }
+        visible={confirmModalVisible}
+        onCancel={() => {
+          setConfirmModalVisible(false);
+          form.resetFields();
+          setTaskVariables({});
+          setSelectedTaskForProcessing(null);
+        }}
+        onOk={() => {
+          form.validateFields()
+            .then((values) => {
+              handleConfirmPayment(values);
+            })
+            .catch((error) => {
+              console.error('表单验证失败:', error);
+            });
+        }}
+        okText="提交"
+        cancelText="取消"
+        width={600}
+      >
+        <Spin spinning={loadingVariables}>
+          <Descriptions bordered column={1} style={{ marginBottom: 16 }}>
+            <Descriptions.Item label="交易ID">
+              {taskVariables.transactionId || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="支付金额">
+              ¥{(taskVariables.amount || 0).toLocaleString()}
+            </Descriptions.Item>
+            <Descriptions.Item label="收款人姓名">
+              {taskVariables.payeeName || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="支付日期">
+              {taskVariables.paymentDate ? new Date(taskVariables.paymentDate).toLocaleDateString() : '-'}
+            </Descriptions.Item>
+          </Descriptions>
+
+          <Form form={form} onFinish={handleConfirmPayment} layout="vertical">
+            <Form.Item 
+              name="confirmationResult" 
+              label="确认结果" 
+              rules={[{ required: true, message: '请选择确认结果' }]}
+            >
+              <Radio.Group>
+                <Radio value="confirmed">确认</Radio>
+                <Radio value="disputed">争议</Radio>
+              </Radio.Group>
+            </Form.Item>
+            <Form.Item name="confirmationComment" label="确认备注">
+              <TextArea rows={4} placeholder="请输入确认备注（可选）" />
+            </Form.Item>
+          </Form>
+        </Spin>
+      </Modal>
+
+      {/* 支付被拒绝对话框 */}
+      <Modal
+        title={
+          <span>
+            <DollarOutlined /> 支付被拒绝
+          </span>
+        }
+        visible={rejectedModalVisible}
+        onCancel={() => {
+          setRejectedModalVisible(false);
+          form.resetFields();
+          setSelectedTaskForProcessing(null);
+        }}
+        onOk={() => {
+          form.validateFields()
+            .then((values) => {
+              handleRejectedPayment(values);
+            })
+            .catch((error) => {
+              console.error('表单验证失败:', error);
+            });
+        }}
+        okText="提交"
+        cancelText="取消"
+      >
+        <Form form={form} onFinish={handleRejectedPayment} layout="vertical">
+          <Form.Item 
+            name="rejectionReason" 
+            label="拒绝原因" 
+            rules={[{ required: true, message: '请输入拒绝原因' }]}
+          >
+            <TextArea rows={4} placeholder="请输入拒绝原因" />
+          </Form.Item>
+          <Form.Item name="rejectionComment" label="拒绝备注">
+            <TextArea rows={3} placeholder="请输入拒绝备注（可选）" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 支付争议处理对话框 */}
+      <Modal
+        title={
+          <span>
+            <DollarOutlined /> 处理支付争议
+          </span>
+        }
+        visible={disputeModalVisible}
+        onCancel={() => {
+          setDisputeModalVisible(false);
+          form.resetFields();
+          setSelectedTaskForProcessing(null);
+        }}
+        onOk={() => {
+          form.validateFields()
+            .then((values) => {
+              handleDisputePayment(values);
+            })
+            .catch((error) => {
+              console.error('表单验证失败:', error);
+            });
+        }}
+        okText="提交"
+        cancelText="取消"
+      >
+        <Form form={form} onFinish={handleDisputePayment} layout="vertical">
+          <Form.Item 
+            name="disputeResolution" 
+            label="争议解决方案" 
+            rules={[{ required: true, message: '请选择争议解决方案' }]}
+          >
+            <Radio.Group>
+              <Radio value="retry">重新支付</Radio>
+              <Radio value="cancel">取消支付</Radio>
+              <Radio value="investigate">调查</Radio>
+            </Radio.Group>
+          </Form.Item>
+          <Form.Item name="disputeComment" label="争议处理备注">
+            <TextArea rows={4} placeholder="请输入争议处理备注（可选）" />
+          </Form.Item>
+        </Form>
       </Modal>
     </Card>
   );

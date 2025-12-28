@@ -333,6 +333,82 @@ graph TB
 - **priority**: 优先级（普通/重要/紧急）
 - **claimComplexity**: 案件复杂度（simple/complex）
 
+### 2. 设置数据库
+
+```bash
+# 连接到本地 PostgreSQL
+psql -U postgres
+
+# 创建所需的数据库
+CREATE DATABASE flowable_cline;
+CREATE DATABASE flowable_demo;
+
+# 验证数据库已创建
+\l
+```
+
+**注意**: 确保本地 PostgreSQL 服务正在运行，默认连接配置为：
+- 主机: localhost:5432
+- 用户名: flowable_cline
+- 密码: flowable_cline
+
+### 3. 初始化数据库
+
+```bash
+# 初始化数据库（推荐方法：使用 SQL 脚本）
+psql -U flowable_cline -d flowable_cline -f resources/init-db.sql
+```
+
+**数据初始化说明：**
+
+系统提供两种数据初始化方式：
+
+1. **SQL 脚本初始化（推荐）**
+   - 文件：`resources/init-db.sql`
+   - 默认方式：通过 SQL 脚本初始化所有数据
+   - 优点：执行速度快，可重复执行
+   - 内容：创建表结构、插入初始数据（用户、角色、保单）
+
+2. **Java 代码初始化（可选）**
+   - 类：`DataInitializer.java`
+   - 启用方式：在 `application.yml` 中设置 `app.data.initialize=true`
+   - 优点：灵活，支持复杂逻辑
+   - 注意：默认禁用（`app.data.initialize=false`）
+
+**默认账户：**
+
+| 用户名 | 密码 | 角色 | 说明 |
+|--------|------|------|------|
+| admin | admin | ADMIN | 系统管理员 |
+| handler1 | admin | CLAIM_HANDLER | 理赔处理员 |
+| auditor1 | admin | APPROVER | 理赔审核员 |
+| manager1 | admin | MANAGER | 理赔经理 |
+
+### 4. 启动后端
+
+```bash
+cd backend
+mvn clean install
+mvn spring-boot:run
+```
+
+后端将在 `http://localhost:8080/api` 启动
+
+### 5. 启动前端
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+前端将在 `http://localhost:3000` 启动
+
+### 6. 访问应用
+
+- **前端应用**: `http://localhost:3000`
+- **API 文档**: `http://localhost:8080/api/swagger-ui.html`
+
 ## 🔧 技术栈
 
 ### 后端技术

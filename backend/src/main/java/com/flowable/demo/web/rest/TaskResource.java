@@ -247,18 +247,71 @@ public class TaskResource {
                 variables = new HashMap<>();
             }
             
-            // Get task info to check if it's a review task
+            // Get task info to check task type
             Task task = cmmnTaskService.createTaskQuery().taskId(taskId).singleResult();
-            if (task != null && "taskReviewClaim".equals(task.getTaskDefinitionKey())) {
-                // This is the review claim task - add DMN input variables
-                log.debug("Completing review claim task - adding DMN input variables");
-                addDmnInputVariables(task, variables);
+            if (task != null) {
+                String taskKey = task.getTaskDefinitionKey();
+                log.debug("Task definition key: {}, processInstanceId: {}, scopeId: {}", 
+                    taskKey, task.getProcessInstanceId(), task.getScopeId());
+                
+                // Check if it's a review claim task - add DMN input variables
+                if ("taskReviewClaim".equals(taskKey)) {
+                    log.debug("Completing review claim task - adding DMN input variables");
+                    addDmnInputVariables(task, variables);
+                }
+                
+                // Check if it's a payment validation task - ensure enum values are strings
+                if ("userTask_validatePayment".equals(taskKey)) {
+                    log.debug("Completing payment validation task with variables: {}", variables);
+                    // Ensure validation result is a string
+                    Object validationResult = variables.get("validationResult");
+                    if (validationResult != null) {
+                        variables.put("validationResult", validationResult.toString());
+                        log.debug("Set validationResult to: {}", variables.get("validationResult"));
+                    }
+                }
+                
+                // Check if it's a payment confirmation task
+                if ("userTask_confirmPayment".equals(taskKey)) {
+                    log.debug("Completing payment confirmation task with variables: {}", variables);
+                    // Ensure confirmation result is a string
+                    Object confirmationResult = variables.get("confirmationResult");
+                    if (confirmationResult != null) {
+                        variables.put("confirmationResult", confirmationResult.toString());
+                        log.debug("Set confirmationResult to: {}", variables.get("confirmationResult"));
+                    }
+                }
+                
+                // Check if it's a dispute handling task
+                if ("userTask_handleDispute".equals(taskKey)) {
+                    log.debug("Completing dispute handling task with variables: {}", variables);
+                    // Ensure dispute resolution is a string
+                    Object disputeResolution = variables.get("disputeResolution");
+                    if (disputeResolution != null) {
+                        variables.put("disputeResolution", disputeResolution.toString());
+                        log.debug("Set disputeResolution to: {}", variables.get("disputeResolution"));
+                    }
+                }
             }
             
-            cmmnTaskService.complete(taskId, variables);
+            log.debug("Completing task {} with variables: {}", taskId, variables);
+            
+            // Determine if task is from BPMN or CMMN engine
+            // BPMN tasks have processInstanceId, CMMN tasks have scopeId
+            boolean isBpmnTask = task != null && task.getProcessInstanceId() != null;
+            
+            if (isBpmnTask) {
+                log.debug("Task is from BPMN process, using taskService.complete()");
+                taskService.complete(taskId, variables);
+            } else {
+                log.debug("Task is from CMMN case, using cmmnTaskService.complete()");
+                cmmnTaskService.complete(taskId, variables);
+            }
+            
+            log.debug("Task {} completed successfully", taskId);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            log.error("Failed to complete task {}: {}", taskId, e.getMessage());
+            log.error("Failed to complete task {}: {}", taskId, e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -307,6 +360,25 @@ public class TaskResource {
         }
         
         return ResponseEntity.ok(convertToDTO(task));
+    }
+
+    /**
+     * 获取任务变量
+     */
+    @GetMapping("/{taskId}/variables")
+    @Operation(summary = "获取任务变量", description = "获取指定任务的变量信息")
+    public ResponseEntity<Map<String, Object>> getTaskVariables(
+            @Parameter(description = "任务ID") @PathVariable String taskId) {
+        log.debug("REST request to get task variables: {}", taskId);
+        
+        try {
+            Map<String, Object> variables = cmmnTaskService.getVariables(taskId);
+            log.debug("Retrieved {} variables for task {}", variables.size(), taskId);
+            return ResponseEntity.ok(variables);
+        } catch (Exception e) {
+            log.error("Failed to get variables for task {}: {}", taskId, e.getMessage());
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     /**

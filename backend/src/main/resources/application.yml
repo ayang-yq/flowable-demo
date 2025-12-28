@@ -42,6 +42,9 @@ flowable:
     password: flowable_cline
     driver-class-name: org.postgresql.Driver
   
+  # 数据库Schema配置 - 强制创建新Schema
+  database-schema-update: true
+  
   # REST API 配置
   rest:
     app:
